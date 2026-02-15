@@ -14,7 +14,13 @@ def pdf_to_text(pdf_path, start_idx, end_idx):
     return text
 
 
-def generate_text_file(text):
+def generate_text_file_du(text):
     # Make text file with text_output
-    with open("output_de.txt", "w", encoding="utf-8") as f:
+    with open("output_du.txt", "w", encoding="utf-8") as f:
+        f.write(text)
+
+
+def generate_text_file_ko(text):
+    # Make text file with text_output
+    with open("output_ko.txt", "w", encoding="utf-8") as f:
         f.write(text)
