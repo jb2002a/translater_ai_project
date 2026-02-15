@@ -16,5 +16,5 @@ def pdf_to_text(pdf_path, start_idx, end_idx):
 
 def generate_text_file(text):
     # Make text file with text_output
-    with open("output.txt", "w", encoding="utf-8") as f:
+    with open("output_de.txt", "w", encoding="utf-8") as f:
         f.write(text)

@@ -1,3 +1,5 @@
+# This module contains functions for pre-processing text, such as cleaning and formatting, to make it suitable for translation.
+
 import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage

@@ -1,5 +1,10 @@
+import os
+from dotenv import load_dotenv
 from pre_process import PdfToTextConvert as Convert
 from pre_process import PreProcessing as PreProcess
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 def main():
@@ -11,18 +16,17 @@ def main():
     end_page = 21  # Ending page index (0-based)
     pdf_path = "D:\\Pdf\\test.pdf"
 
-    print(f"Converting PDF pages {start_page} to {end_page}...")
+    print(f"Gathering text datas from PDF pages {start_page} to {end_page}...")
 
     text = Convert.pdf_to_text(pdf_path, start_page, end_page)
 
     print("Start pre-processing the text...")
 
-    # text = PreProcess.pre_process_text(text)
+    text = PreProcess.pre_process_text(text)
 
     print("PDF conversion completed! Output saved to output.txt")
 
-    with open("output.txt", "w", encoding="utf-8") as f:
-        f.write(text)
+    Convert.generate_text_file(text)
 
 
 if __name__ == "__main__":
