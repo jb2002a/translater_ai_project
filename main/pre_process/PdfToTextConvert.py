@@ -5,12 +5,13 @@
 import fitz
 
 
-def pdf_to_text(pdf_path, start_idx, end_idx):
+def pdf_to_text(pdf_path, idx):
     doc = fitz.open(pdf_path)
     text = ""
-    for page_num in range(start_idx, end_idx + 1):
-        page = doc.load_page(page_num)
-        text += page.get_text("text")
+
+    page = doc.load_page(idx)
+    text += page.get_text("text")
+
     return text
 
 

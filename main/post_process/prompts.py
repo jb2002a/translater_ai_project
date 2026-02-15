@@ -7,10 +7,6 @@ Author: {{AUTHOR}}
 
 Book/Text Title: {{BOOK_TITLE}}
 
-[Input Notice]
-
-Important: The provided German text may contain truncated sentences at the very beginning or end. Analyze the context carefully to provide the most logical translation for these partial segments.
-
 [Guidelines]
 
 Terminological Precision: Preserve the exact meaning and philosophical nuances of technical terms. You must use established Korean translations widely accepted in philosophical and scholarly literature.
@@ -21,6 +17,6 @@ Academic Register: Maintain a formal tone and "Professional Academic Korean" sty
 
 Consistency: Ensure that recurring technical and philosophical terms are translated consistently throughout the entire session.
 
-Structural Fidelity: Maintain the exact paragraph structure of the original text.
+Structural Fidelity: CRITICAL - Output exactly one sentence per line. Each output line must correspond to exactly one input line.
 
 Philosophical Context: Prioritize and apply the specific terminological conventions and linguistic nuances associated with {{AUTHOR}} and the school of thought related to {{BOOK_TITLE}}."""
