@@ -17,23 +17,23 @@ def main():
     pdf_path = "D:\\Pdf\\test.pdf"
 
     print(f"Gathering text data from PDF page {idx}...")
-
     text = Convert.pdf_to_text(pdf_path, idx)
 
     print("Start pre-processing the text...")
-    text = PreProcess.pre_process_text(text)
+    preprocess_text = PreProcess.pre_process_text(text)
+    # refactor_text = PreProcess.refractor_text(preprocess_text)
 
     print("PDF conversion completed! Output saved to output_du.txt")
-    Convert.generate_text_file_du(text)
+    Convert.generate_text_file_du(preprocess_text)
 
-    author = "Wilhelm Dilthey"
-    book_title = "Einleitung in die Geisteswissenschaften"
+    # author = "Wilhelm Dilthey"
+    # book_title = "Einleitung in die Geisteswissenschaften"
 
-    print("Start initial translation from German to Korean...")
-    translated_text = InitialTranslate.initial_translate(text, author, book_title)
+    # print("Start initial translation from German to Korean...")
+    # translated_text = InitialTranslate.initial_translate(text, author, book_title)
 
-    print("Initial translation completed! Output saved to output_ko.txt")
-    Convert.generate_text_file_ko(translated_text)
+    # print("Initial translation completed! Output saved to output_ko.txt")
+    # Convert.generate_text_file_ko(translated_text)
 
 
 if __name__ == "__main__":
