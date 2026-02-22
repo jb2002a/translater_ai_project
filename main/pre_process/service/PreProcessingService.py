@@ -1,16 +1,21 @@
 # This module contains functions for pre-processing text, such as cleaning and formatting, to make it suitable for translation.
 
 import os
+from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
-from . import PdfToTextConvert as Convert
-from .prompts import GERMAN_OCR_RESTORATION_PROMPT, REFACTORING_PROMPT
+from . import ExtractService as Convert
+from ..prompts import GERMAN_OCR_RESTORATION_PROMPT, REFACTORING_PROMPT
+from ...TranslationState import GraphState
+
+load_dotenv()
 
 chat = ChatGoogleGenerativeAI(
     model="gemini-2.0-flash", api_key=os.getenv("GOOGLE_API_KEY")
 )
 
 
+# 전처리 함수
 def pre_process_text(text):
     # Pre-process the text to make it suitable for translation.
 
@@ -24,6 +29,7 @@ def pre_process_text(text):
     return processed_text.content
 
 
+# 리펙터링 함수
 def refractor_text(text):
     messages = [
         SystemMessage(content=REFACTORING_PROMPT),

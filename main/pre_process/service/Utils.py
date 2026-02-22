@@ -1,0 +1,13 @@
+# 텍스트 파일로 저장하는 함수
+
+
+def generate_text_file_du(text):
+    # Make text file with text_output
+    with open("output_du.txt", "w", encoding="utf-8") as f:
+        f.write(text)
+
+
+def generate_text_file_ko(text):
+    # Make text file with text_output
+    with open("output_ko.txt", "w", encoding="utf-8") as f:
+        f.write(text)

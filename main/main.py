@@ -1,39 +1,19 @@
-import os
 from dotenv import load_dotenv
-from pre_process import PdfToTextConvert as Convert
-from pre_process import PreProcessing as PreProcess
-import post_process.Initial_translate as InitialTranslate
+import fitz
 
 # Load environment variables from .env file
 load_dotenv()
 
 
 def main():
-    """
-    Main function to convert a single PDF page to text and translate.
-    """
-    # 단일 페이지 인덱스 지정
-    idx = 20  # 번역할 페이지 인덱스 (0-based)
-    pdf_path = "D:\\Pdf\\test.pdf"
+    doc = fitz.open("D:\\Pdf\\test.pdf")
+    full_text = ""
 
-    print(f"Gathering text data from PDF page {idx}...")
-    text = Convert.pdf_to_text(pdf_path, idx)
+    for page in doc:
+        full_text += page.get_text("text") + ""
 
-    print("Start pre-processing the text...")
-    preprocess_text = PreProcess.pre_process_text(text)
-    # refactor_text = PreProcess.refractor_text(preprocess_text)
-
-    print("PDF conversion completed! Output saved to output_du.txt")
-    Convert.generate_text_file_du(preprocess_text)
-
-    # author = "Wilhelm Dilthey"
-    # book_title = "Einleitung in die Geisteswissenschaften"
-
-    # print("Start initial translation from German to Korean...")
-    # translated_text = InitialTranslate.initial_translate(text, author, book_title)
-
-    # print("Initial translation completed! Output saved to output_ko.txt")
-    # Convert.generate_text_file_ko(translated_text)
+    with open("output.txt", "w", encoding="utf-8") as f:
+        f.write(full_text)
 
 
 if __name__ == "__main__":
