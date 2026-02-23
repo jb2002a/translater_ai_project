@@ -1,5 +1,5 @@
 from ..service.ExtractService import pdf_to_text
-from ..service.PreProcessingService import pre_process_text
+from ..service.PreProcessingService import pre_process_text, refractor_text
 from ...TranslationState import GraphState
 
 
@@ -13,5 +13,5 @@ def cleanup_node(state: GraphState):
 # 리펙터링 노드
 def refractor_node(state: GraphState):
     cleaned_text = state["cleaned_text"]
-    refractored_text = pre_process_text(cleaned_text)
+    refractored_text = refractor_text(cleaned_text)
     return {"refractored_text": refractored_text}

@@ -4,9 +4,8 @@ import os
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
-from . import ExtractService as Convert
-from ..prompts import GERMAN_OCR_RESTORATION_PROMPT, REFACTORING_PROMPT
-from ...TranslationState import GraphState
+from ..prompts.prompts import GERMAN_OCR_RESTORATION_PROMPT, REFACTORING_PROMPT
+import sqlite3
 
 load_dotenv()
 
@@ -39,3 +38,32 @@ def refractor_text(text):
     refractored_text = chat.invoke(messages)
 
     return refractored_text.content
+
+
+def save_to_db(pdf_path, author, book_title, sentences):
+    conn = sqlite3.connect("philosophy_translation.db")
+    cur = conn.cursor()
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS processed_sentences (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pdf_path TEXT,
+            author TEXT,
+            book_title TEXT,
+            german_sentence TEXT,
+            status TEXT DEFAULT 'pending'
+        )
+    """
+    )
+
+    data = [(pdf_path, author, book_title, s) for s in sentences]
+    cur.executemany(
+        """
+        INSERT INTO processed_sentences (pdf_path, author, book_title, german_sentence)
+        VALUES (?, ?, ?, ?)
+    """,
+        data,
+    )
+
+    conn.commit()
+    conn.close()
