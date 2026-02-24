@@ -1,4 +1,4 @@
-from ..service.ExtractService import pdf_to_text
+from ..service.ExtractService import extract_text
 from ..service.PreProcessingService import pre_process_text, refractor_text, save_to_db
 from ...TranslationState import GraphState
 

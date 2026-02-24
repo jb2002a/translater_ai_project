@@ -2,16 +2,13 @@
 
 import os
 from dotenv import load_dotenv
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from ..prompts.prompts import GERMAN_OCR_RESTORATION_PROMPT, REFACTORING_PROMPT
 import sqlite3
+from ...models import models
 
 load_dotenv()
 
-chat = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash", api_key=os.getenv("GOOGLE_API_KEY")
-)
 
 # 전처리 함수와 리펙터링 함수는 pre_prcess의 prompts.py에 정의된 프롬프트를 사용.
 
@@ -22,6 +19,8 @@ def pre_process_text(text):
         SystemMessage(content=GERMAN_OCR_RESTORATION_PROMPT),
         HumanMessage(content=text),
     ]
+
+    chat = models.get_chat_model_google()
 
     processed_text = chat.invoke(messages)
 

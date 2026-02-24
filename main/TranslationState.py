@@ -7,4 +7,4 @@ class GraphState(TypedDict):
     book_title: str
     raw_text: str
     cleaned_text: str
-    sentences: List[str]  # 문장 단위로 나눈 텍스트
+    refractored_text: str
