@@ -3,6 +3,6 @@ from ...TranslationState import GraphState
 
 
 def extract_node(state: GraphState):
-    doc = state["pdf_doc"]
-    extracted_text = extract_text(doc)
+    doc_path = state["pdf_path"]
+    extracted_text = extract_text(doc_path)
     return {"raw_text": extracted_text}

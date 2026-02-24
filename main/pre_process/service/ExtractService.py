@@ -4,13 +4,13 @@
 
 import fitz
 
+
 # 추출 함수
-def extract_text(doc):
+def extract_text(doc_path):
     full_text = ""
+    doc = fitz.open(doc_path)
 
     for page in doc:
         full_text += page.get_text("text") + ""
 
     return full_text
-
-
