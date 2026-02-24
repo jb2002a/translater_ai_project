@@ -1,5 +1,5 @@
 from ..service.ExtractService import pdf_to_text
-from ..service.PreProcessingService import pre_process_text, refractor_text
+from ..service.PreProcessingService import pre_process_text, refractor_text, save_to_db
 from ...TranslationState import GraphState
 
 
@@ -15,3 +15,13 @@ def refractor_node(state: GraphState):
     cleaned_text = state["cleaned_text"]
     refractored_text = refractor_text(cleaned_text)
     return {"refractored_text": refractored_text}
+
+
+# 데이터베이스 저장 노드
+def save_db_node(state: GraphState):
+    pdf_path = state["pdf_path"]
+    author = state["author"]
+    book_title = state["book_title"]
+    sentences = state["refractored_text"].split("\n")
+    save_to_db(pdf_path, author, book_title, sentences)
+    return {"db_status": "saved"}

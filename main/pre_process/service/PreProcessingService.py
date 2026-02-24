@@ -13,11 +13,11 @@ chat = ChatGoogleGenerativeAI(
     model="gemini-2.0-flash", api_key=os.getenv("GOOGLE_API_KEY")
 )
 
+# 전처리 함수와 리펙터링 함수는 pre_prcess의 prompts.py에 정의된 프롬프트를 사용.
+
 
 # 전처리 함수
 def pre_process_text(text):
-    # Pre-process the text to make it suitable for translation.
-
     messages = [
         SystemMessage(content=GERMAN_OCR_RESTORATION_PROMPT),
         HumanMessage(content=text),
@@ -40,6 +40,7 @@ def refractor_text(text):
     return refractored_text.content
 
 
+# 데이터베이스에 저장하는 함수
 def save_to_db(pdf_path, author, book_title, sentences):
     conn = sqlite3.connect("philosophy_translation.db")
     cur = conn.cursor()
