@@ -1,0 +1,9 @@
+---
+description: LangChain/LangGraph 코드 작성 시 최신 문법·API를 참고할 것
+globs: **/*.py
+---
+
+# LangChain / LangGraph
+
+- LangChain·LangGraph 관련 코드를 작성·수정할 때는 **항상 최신 공식 문서·문법을 참고**하여 제작한다.
+- deprecated API나 구형 패턴을 쓰지 않고, 현재 권장되는 방식(예: LCEL, 최신 에이전트 API)을 따른다.

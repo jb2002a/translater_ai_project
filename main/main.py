@@ -18,9 +18,9 @@ def create_workflow():
     workflow.add_node("save_db", save_db_node)
 
     workflow.set_entry_point("extract")
-    workflow.add_edge("extract", "cleanup")
-    workflow.add_edge("cleanup", "chunking")
-    workflow.add_edge("chunking", "save_db")
+    workflow.add_edge("extract", "chunking")
+    workflow.add_edge("chunking", "cleanup")
+    workflow.add_edge("cleanup", "save_db")
     workflow.add_edge("save_db", END)
 
     return workflow.compile()

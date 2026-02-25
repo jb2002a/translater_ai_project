@@ -6,5 +6,6 @@ class GraphState(TypedDict):
     author: str
     book_title: str
     raw_text: str
+    raw_chunks: List[str]
     cleaned_text: str
-    refractored_text: str
+    sentences: List[str]
