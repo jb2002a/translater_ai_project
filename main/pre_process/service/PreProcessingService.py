@@ -33,9 +33,8 @@ def refractor_text(text):
         SystemMessage(content=REFACTORING_PROMPT),
         HumanMessage(content=text),
     ]
-
+    chat = models.get_chat_model_google()
     refractored_text = chat.invoke(messages)
-
     return refractored_text.content
 
 

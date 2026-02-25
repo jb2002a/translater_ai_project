@@ -15,6 +15,6 @@ def get_chat_model_anthropic():
 
 # for pre-processing
 def get_chat_model_google():
-    chat = ChatGoogleGenerativeAI(
-        model="gemini-1.5-pro", api_key=os.getenv("GOOGLE_API_KEY")
+    return ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash", api_key=os.getenv("GOOGLE_API_KEY")
     )
