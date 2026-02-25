@@ -27,15 +27,15 @@ def pre_process_text(text):
     return processed_text.content
 
 
-# 리펙터링 함수
-def refractor_text(text):
+# 리펙터링 함수 (LLM 기반, 참고용)
+def refactor_text(text):
     messages = [
         SystemMessage(content=REFACTORING_PROMPT),
         HumanMessage(content=text),
     ]
     chat = models.get_chat_model_google()
-    refractored_text = chat.invoke(messages)
-    return refractored_text.content
+    refactored_text = chat.invoke(messages)
+    return refactored_text.content
 
 
 # 데이터베이스에 저장하는 함수

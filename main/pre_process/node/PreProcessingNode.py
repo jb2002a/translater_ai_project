@@ -1,5 +1,6 @@
 from ..service.ExtractService import extract_text
-from ..service.PreProcessingService import pre_process_text, refractor_text, save_to_db
+from ..service.PreProcessingService import pre_process_text, save_to_db
+from ..service.SegmentService import segment_cleaned_text
 from ...TranslationState import GraphState
 
 
@@ -10,11 +11,11 @@ def cleanup_node(state: GraphState):
     return {"cleaned_text": cleaned_text}
 
 
-# 리펙터링 노드
-def refractor_node(state: GraphState):
+# PySBD 문장 청킹 노드 (refactor_node 대체)
+def chunking_node(state: GraphState):
     cleaned_text = state["cleaned_text"]
-    refractored_text = refractor_text(cleaned_text)
-    return {"refractored_text": refractored_text}
+    refactored_text = segment_cleaned_text(cleaned_text)
+    return {"refactored_text": refactored_text}
 
 
 # 데이터베이스 저장 노드
@@ -22,6 +23,6 @@ def save_db_node(state: GraphState):
     pdf_path = state["pdf_path"]
     author = state["author"]
     book_title = state["book_title"]
-    sentences = state["refractored_text"].split("\n")
+    sentences = state["refactored_text"].split("\n")
     save_to_db(pdf_path, author, book_title, sentences)
     return {"db_status": "saved"}

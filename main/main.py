@@ -2,7 +2,7 @@ from langgraph.graph import StateGraph, END
 from .pre_process.node.ExtractNode import extract_node
 from .pre_process.node.PreProcessingNode import (
     cleanup_node,
-    refractor_node,
+    chunking_node,
     save_db_node,
 )
 from .TranslationState import GraphState
@@ -14,13 +14,13 @@ def create_workflow():
 
     workflow.add_node("extract", extract_node)
     workflow.add_node("cleanup", cleanup_node)
-    workflow.add_node("refractor", refractor_node)
+    workflow.add_node("chunking", chunking_node)
     workflow.add_node("save_db", save_db_node)
 
     workflow.set_entry_point("extract")
     workflow.add_edge("extract", "cleanup")
-    workflow.add_edge("cleanup", "refractor")
-    workflow.add_edge("refractor", "save_db")
+    workflow.add_edge("cleanup", "chunking")
+    workflow.add_edge("chunking", "save_db")
     workflow.add_edge("save_db", END)
 
     return workflow.compile()
