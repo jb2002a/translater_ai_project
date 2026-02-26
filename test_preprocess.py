@@ -1,6 +1,6 @@
 """
-extract_node -> chunking_node 흐름만 테스트.
-PDF에서 텍스트 추출 후 PySBD로 문장 단위 청킹이 잘 되는지 확인합니다.
+extract_node -> chunking_node -> cleanup_node 흐름 테스트.
+PDF에서 텍스트 추출 후 PySBD로 문장 단위 청킹, 청크별 병렬 cleanup이 잘 되는지 확인합니다.
 """
 import sys
 from pathlib import Path
@@ -14,7 +14,7 @@ from langgraph.graph import StateGraph, END
 
 from main.TranslationState import GraphState
 from main.pre_process.node.ExtractNode import extract_node
-from main.pre_process.node.PreProcessingNode import chunking_node
+from main.pre_process.node.PreProcessingNode import chunking_node, cleanup_node
 
 # main.py 예시와 동일한 기본 state 값
 DEFAULT_STATE = {
@@ -25,13 +25,15 @@ DEFAULT_STATE = {
 
 
 def create_extract_chunking_workflow():
-    """extract -> chunking 만 있는 워크플로우."""
+    """extract -> chunking -> cleanup 워크플로우."""
     workflow = StateGraph(GraphState)
     workflow.add_node("extract", extract_node)
     workflow.add_node("chunking", chunking_node)
+    workflow.add_node("cleanup", cleanup_node)
     workflow.set_entry_point("extract")
     workflow.add_edge("extract", "chunking")
-    workflow.add_edge("chunking", END)
+    workflow.add_edge("chunking", "cleanup")
+    workflow.add_edge("cleanup", END)
     return workflow.compile()
 
 
@@ -50,6 +52,7 @@ def run_test(pdf_path: str = None, author: str = None, book_title: str = None):
 
     raw_text = out.get("raw_text", "")
     raw_chunks = out.get("raw_chunks", [])
+    sentences = out.get("sentences", [])
 
     print("=" * 60)
     print("[1] 추출(raw_text)")
@@ -76,6 +79,22 @@ def run_test(pdf_path: str = None, author: str = None, book_title: str = None):
     non_empty = sum(1 for c in raw_chunks if isinstance(c, str) and c.strip())
     assert non_empty == len(raw_chunks), "일부 청크가 비어 있거나 문자열이 아님"
     print("\n  [OK] 모든 청크가 비어 있지 않은 문자열입니다.")
+
+    print("=" * 60)
+    print("[3] cleanup(sentences)")
+    print("=" * 60)
+    print(f"  문장 개수: {len(sentences)}")
+    if not sentences:
+        print("  경고: cleanup 결과 문장이 없습니다.")
+        return False
+    for i, sent in enumerate(sentences[:10]):
+        preview = sent[:80] + "..." if len(sent) > 80 else sent
+        print(f"  [{i}] ({len(sent)}자) {preview!r}")
+    if len(sentences) > 10:
+        print(f"  ... 외 {len(sentences) - 10}개 문장")
+    non_empty_sent = sum(1 for s in sentences if isinstance(s, str) and s.strip())
+    assert non_empty_sent == len(sentences), "일부 문장이 비어 있거나 문자열이 아님"
+    print("\n  [OK] cleanup 완료, 모든 문장이 유효합니다.")
     return True
 
 
@@ -114,8 +133,8 @@ if __name__ == "__main__":
 
     if not Path(pdf_path).exists():
         print(f"파일 없음: {pdf_path}")
-        print("사용법: python test.py [PDF경로]")
-        print("       python test.py unit   # PDF 없이 청킹만 테스트")
+        print("사용법: python test_preprocess.py [PDF경로]")
+        print("       python test_preprocess.py unit   # PDF 없이 청킹만 테스트")
         sys.exit(1)
 
     success = run_test(pdf_path=pdf_path, author=author, book_title=book_title)

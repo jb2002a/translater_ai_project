@@ -4,7 +4,8 @@ import pysbd
 
 
 def segment_raw_to_list(text: str) -> List[str]:
-    """raw_text를 문장 단위로 나누어 청크 리스트로 반환 (청킹 → 병렬 cleanup용)."""
+    """raw_text를 문장 단위로 나누어 청크 리스트로 반환 (청킹 → 병렬 cleanup용).
+    줄바꿈 정규화는 extract 단계에서 이미 적용된 raw_text를 받습니다."""
     if not text or not text.strip():
         return []
     seg = pysbd.Segmenter(language="de", clean=False)
