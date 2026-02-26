@@ -16,9 +16,11 @@ from main.TranslationState import GraphState
 from main.pre_process.node.ExtractNode import extract_node
 from main.pre_process.node.PreProcessingNode import chunking_node, cleanup_node
 
+import config
+
 # main.py 예시와 동일한 기본 state 값
 DEFAULT_STATE = {
-    "pdf_path": "D:\\Pdf\\test.pdf",
+    "pdf_path": config.DEFAULT_PDF_PATH,
     "author": "Dilthey, Wilhelm",
     "book_title": "Dilthey, Wilhelm: Einleitung in die Geisteswissenschaften. Versuch einer Grundlegung für das Studium der Gesellschaft und der Geschichte. Bd. 1. Leipzig, 1883",
 }

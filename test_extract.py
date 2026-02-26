@@ -10,8 +10,9 @@ if str(project_root) not in sys.path:
 
 from main.TranslationState import GraphState
 from main.pre_process.node.ExtractNode import extract_node
+import config
 
-DEFAULT_PDF = "D:\\Pdf\\test.pdf"
+DEFAULT_PDF = config.DEFAULT_PDF_PATH
 
 
 def show_extract(pdf_path: str):

@@ -1,3 +1,12 @@
+from pathlib import Path
+import sys
+
+# main/main.py 직접 실행 시 프로젝트 루트에서 config 로드
+_root = Path(__file__).resolve().parent.parent
+if str(_root) not in sys.path:
+    sys.path.insert(0, str(_root))
+import config
+
 from langgraph.graph import StateGraph, END
 from .pre_process.node.ExtractNode import extract_node
 from .pre_process.node.PreProcessingNode import (
@@ -31,7 +40,7 @@ if __name__ == "__main__":
     app = create_workflow()
 
     initial_state = {
-        "pdf_path": "D:\\Pdf\\test.pdf",
+        "pdf_path": config.DEFAULT_PDF_PATH,
         "author": "Dilthey, Wilhelm",
         "book_title": "Dilthey, Wilhelm: Einleitung in die Geisteswissenschaften. Versuch einer Grundlegung für das Studium der Gesellschaft und der Geschichte. Bd. 1. Leipzig, 1883",
     }

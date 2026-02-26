@@ -14,8 +14,9 @@ from langgraph.graph import StateGraph, END
 from main.TranslationState import GraphState
 from main.pre_process.node.ExtractNode import extract_node
 from main.pre_process.node.PreProcessingNode import chunking_node
+import config
 
-DEFAULT_PDF = "D:\\Pdf\\test.pdf"
+DEFAULT_PDF = config.DEFAULT_PDF_PATH
 
 
 def create_extract_chunking_only_workflow():

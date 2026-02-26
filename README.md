@@ -41,7 +41,7 @@ translater_ai_project/
 │   │   │   └── PreProcessingNode.py # chunking_node, cleanup_node, save_db_node
 │   │   ├── service/
 │   │   │   ├── ExtractService.py   # PDF 텍스트 추출 (PyMuPDF)
-│   │   │   ├── SegmentService.py   # PySBD 문장 분리
+│   │   │   ├── SegmentService.py   # SoMaJo 문장 분리 (독일어)
 │   │   │   ├── PreProcessingService.py # 청크별 LLM 전처리, DB 저장
 │   │   │   └── Utils.py            # DB 읽기, 텍스트 파일 출력
 │   │   └── prompts/
@@ -61,7 +61,7 @@ translater_ai_project/
 
 - **오케스트레이션**: LangGraph (StateGraph)
 - **PDF**: PyMuPDF (`fitz`)
-- **문장 분리**: PySBD (독일어)
+- **문장 분리**: SoMaJo (독일어)
 - **LLM**: LangChain (Google Gemini 2.5 Flash – 전처리, Anthropic Claude – 번역)
 - **저장소**: SQLite (`philosophy_translation.db`)
 
@@ -80,7 +80,7 @@ pip install -r requirements.txt
 - `langgraph`
 - `langchain-google-genai`, `langchain-anthropic`, `langchain-core`
 - `pymupdf` (fitz)
-- `pysbd`
+- `SoMaJo`
 - `python-dotenv`
 
 ### 2. 환경 변수 (.env)
@@ -100,12 +100,15 @@ pip install -r requirements.txt
 
 `main/main.py`에서 워크플로우를 만들고, `pdf_path`, `author`, `book_title`을 넣어 실행합니다.
 
+**경로 설정**: Windows의 D: 드라이브(보조장치 x31)는 Mac에서 `/Volumes/x31/`로 마운트됩니다. 기본 PDF 경로는 `config.py`에서 OS별로 설정됩니다 (Windows: `D:\Pdf\test.pdf`, macOS: `/Volumes/x31/Pdf/test.pdf`). 다른 경로는 `config.DEFAULT_PDF_PATH`를 수정하거나 실행 시 `pdf_path`를 넘기면 됩니다.
+
 ```python
+import config
 from main.main import create_workflow
 
 app = create_workflow()
 initial_state = {
-    "pdf_path": "D:\\Pdf\\test.pdf",
+    "pdf_path": config.DEFAULT_PDF_PATH,
     "author": "Dilthey, Wilhelm",
     "book_title": "Dilthey, Wilhelm: Einleitung in die Geisteswissenschaften. ...",
 }
