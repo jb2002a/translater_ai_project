@@ -12,20 +12,24 @@ load_dotenv()
 
 
 # 전처리 함수 (단일 텍스트)
-def pre_process_text(text):
+# config가 있으면 그래프에서 내려온 콜백 사용(중복 트레이싱 방지), 없으면 여기서 핸들러 생성
+def pre_process_text(text, config=None):
     messages = [
         SystemMessage(content=GERMAN_OCR_RESTORATION_PROMPT),
         HumanMessage(content=text),
     ]
 
     chat = models.get_chat_model_google()
+    if config is None:
+        h = models.get_langfuse_handler()
+        config = {"callbacks": [h]} if h else {}
 
-    processed_text = chat.invoke(messages)
+    processed_text = chat.invoke(messages, config=config)
 
     return processed_text.content
 
 
-def pre_process_chunks_parallel(raw_chunks: list[str]) -> str:
+def pre_process_chunks_parallel(raw_chunks: list[str], config=None) -> str:
     """
     청크 리스트를 병렬로 전처리한 뒤, 한 문장 per line 문자열로 반환.
 
@@ -35,13 +39,14 @@ def pre_process_chunks_parallel(raw_chunks: list[str]) -> str:
       ThreadPoolExecutor로 동시에 호출하고, 원본 순서를 유지한 채 이어 붙임.
     - 반환: 청크 순서대로 정리된 문자열(줄바꿈 구분). cleanup_node에서 split하여
       state["sentences"]로 넣고 save_db_node에서 사용.
+    - config: 그래프에서 내려온 RunnableConfig. 넘기면 같은 콜백으로 트레이싱(중복 방지).
     """
     if not raw_chunks:
         return ""
     cleaned_list = [None] * len(raw_chunks)
 
     def process(i: int, chunk: str):
-        return i, pre_process_text(chunk)  # 청크별 LLM 호출
+        return i, pre_process_text(chunk, config=config)  # 청크별 LLM 호출
 
     # cleanup 노드는 1회 실행되며, 내부에서 청크별 pre_process_text(LLM)를 병렬 호출
     with ThreadPoolExecutor() as executor:

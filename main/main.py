@@ -16,6 +16,7 @@ from .pre_process.node.PreProcessingNode import (
 )
 from .TranslationState import GraphState
 from .pre_process.service.Utils import read_from_db, generate_text_file_du
+from .models import models
 
 
 def create_workflow():
@@ -45,8 +46,9 @@ if __name__ == "__main__":
         "book_title": "Dilthey, Wilhelm: Einleitung in die Geisteswissenschaften. Versuch einer Grundlegung für das Studium der Gesellschaft und der Geschichte. Bd. 1. Leipzig, 1883",
     }
 
-    # Run the workflow
-    final_output = app.invoke(initial_state)
+    # Run the workflow (Langfuse로 전체 파이프라인 트레이싱)
+    langfuse_handler = models.get_langfuse_handler()
+    final_output = app.invoke(initial_state, config={"callbacks": [langfuse_handler]} if langfuse_handler else {})
     print(f"Workflow Status: {final_output.get('db_status')}")
 
 

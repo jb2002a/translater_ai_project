@@ -1,1 +1,7 @@
 SoMaJo>=2.0.0
+langfuse
+langchain
+langchain-core
+langchain-anthropic
+langchain-google-genai
+langgraph

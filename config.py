@@ -10,4 +10,4 @@ if sys.platform == "win32":
     DEFAULT_PDF_PATH = r"D:\Pdf\test.pdf"
 else:
     # macOS: 외장 드라이브는 /Volumes/<볼륨이름>/ 아래에 마운트됨
-    DEFAULT_PDF_PATH = "/Volumes/x31/Pdf/test.pdf"
+    DEFAULT_PDF_PATH = "/Users/leejaebin/Desktop/test.pdf"
