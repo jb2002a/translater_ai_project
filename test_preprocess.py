@@ -1,6 +1,6 @@
 """
 extract_node -> chunking_node -> cleanup_node 흐름 테스트.
-PDF에서 텍스트 추출 후 PySBD로 문장 단위 청킹, 청크별 병렬 cleanup이 잘 되는지 확인합니다.
+PDF에서 텍스트 추출 후 SoMaJo로 문장 단위 청킹, 청크별 병렬 cleanup이 잘 되는지 확인합니다.
 """
 import sys
 from pathlib import Path
