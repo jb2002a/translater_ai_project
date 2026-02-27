@@ -8,6 +8,12 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from ..prompts.prompts import GERMAN_OCR_RESTORATION_PROMPT
 import sqlite3
 from ...models import models
+from ...exceptions import (
+    CleanupChunkError,
+    DatabaseError,
+    LLMProviderError,
+    TranslaterAIError,
+)
 
 load_dotenv()
 
@@ -55,9 +61,14 @@ def cleanup_text(text):
         SystemMessage(content=GERMAN_OCR_RESTORATION_PROMPT),
         HumanMessage(content=text),
     ]
-    chat = models.get_chat_model_google()
-    processed_text = chat.invoke(messages)
-    return processed_text.content
+    try:
+        chat = models.get_chat_model_google()
+        processed_text = chat.invoke(messages)
+        return processed_text.content
+    except TranslaterAIError:
+        raise
+    except Exception as e:
+        raise LLMProviderError("Google LLM cleanup 호출 실패", cause=e) from e
 
 
 def cleanup_chunks_parallel(raw_chunks: list[str]) -> list[str]:
@@ -84,36 +95,47 @@ def cleanup_chunks_parallel(raw_chunks: list[str]) -> list[str]:
         with ThreadPoolExecutor() as executor:
             futures = {executor.submit(process, i, c): i for i, c in enumerate(raw_chunks)}
             for fut in as_completed(futures):
-                i, content = fut.result()
-                cleaned_list[i] = content
+                try:
+                    i, content = fut.result()
+                    cleaned_list[i] = content
+                except Exception as e:
+                    idx = futures.get(fut)
+                    raise CleanupChunkError(
+                        f"청크 cleanup 실패 (chunk_index={idx})",
+                        chunk_index=idx,
+                        cause=e,
+                    ) from e
     return cleaned_list
 
 
 # 데이터베이스에 저장하는 함수
 def save_to_db(pdf_path, author, book_title, sentences):
-    conn = sqlite3.connect("philosophy_translation.db")
-    cur = conn.cursor()
-    cur.execute(
+    try:
+        conn = sqlite3.connect("philosophy_translation.db")
+        cur = conn.cursor()
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS processed_sentences (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pdf_path TEXT,
+                author TEXT,
+                book_title TEXT,
+                german_sentence TEXT,
+                status TEXT DEFAULT 'pending'
+            )
         """
-        CREATE TABLE IF NOT EXISTS processed_sentences (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            pdf_path TEXT,
-            author TEXT,
-            book_title TEXT,
-            german_sentence TEXT,
-            status TEXT DEFAULT 'pending'
         )
-    """
-    )
 
-    data = [(pdf_path, author, book_title, s) for s in sentences]
-    cur.executemany(
-        """
-        INSERT INTO processed_sentences (pdf_path, author, book_title, german_sentence)
-        VALUES (?, ?, ?, ?)
-    """,
-        data,
-    )
+        data = [(pdf_path, author, book_title, s) for s in sentences]
+        cur.executemany(
+            """
+            INSERT INTO processed_sentences (pdf_path, author, book_title, german_sentence)
+            VALUES (?, ?, ?, ?)
+        """,
+            data,
+        )
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+        conn.close()
+    except sqlite3.Error as e:
+        raise DatabaseError("DB 저장 실패 (philosophy_translation.db)", cause=e) from e
