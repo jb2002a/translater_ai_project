@@ -1,8 +1,6 @@
-from langchain_core.runnables import RunnableConfig
-
 from ..service.ExtractService import extract_text
 from ..service.PreProcessingService import (
-    pre_process_chunks_parallel,
+    cleanup_chunks_parallel,
     rebatch_chunks_by_tokens,
     save_to_db,
 )
@@ -17,12 +15,11 @@ def chunking_node(state: GraphState):
     return {"raw_chunks": raw_chunks}
 
 
-# 청크 재정립(5만 토큰 단위) 후 병렬 cleanup → sentences (한 문장 per line → 리스트)
-def cleanup_node(state: GraphState, config: RunnableConfig):
+# 청크 재정립(5만 토큰 단위) 후 병렬 cleanup → sentences 리스트 그대로
+def cleanup_node(state: GraphState):
     raw_chunks = state["raw_chunks"]
     batched_chunks = rebatch_chunks_by_tokens(raw_chunks, max_tokens=50_000)
-    refactored_text = pre_process_chunks_parallel(batched_chunks, config=config)
-    sentences = refactored_text.split("\n") if refactored_text else []
+    sentences = cleanup_chunks_parallel(batched_chunks)
     return {"sentences": sentences}
 
 

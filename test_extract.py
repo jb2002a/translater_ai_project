@@ -12,14 +12,13 @@ from langgraph.graph import StateGraph, END
 
 from main.TranslationState import GraphState
 from main.pre_process.node.ExtractNode import extract_node
-from main.models import models
 import config
 
 DEFAULT_PDF = config.DEFAULT_PDF_PATH
 
 
 def create_extract_only_workflow():
-    """extract 노드만 있는 워크플로우 (Langfuse 트레이싱용)."""
+    """extract 노드만 있는 워크플로우."""
     workflow = StateGraph(GraphState)
     workflow.add_node("extract", extract_node)
     workflow.set_entry_point("extract")
@@ -38,8 +37,7 @@ def show_extract(pdf_path: str):
         "sentences": [],
     }
     app = create_extract_only_workflow()
-    langfuse_handler = models.get_langfuse_handler()
-    out = app.invoke(state, config={"callbacks": [langfuse_handler]} if langfuse_handler else {})
+    out = app.invoke(state)
     raw_text = out.get("raw_text", "")
 
     print("=" * 60)

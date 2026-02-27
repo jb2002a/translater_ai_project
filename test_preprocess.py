@@ -15,7 +15,6 @@ from langgraph.graph import StateGraph, END
 from main.TranslationState import GraphState
 from main.pre_process.node.ExtractNode import extract_node
 from main.pre_process.node.PreProcessingNode import chunking_node, cleanup_node
-from main.models import models
 
 import config
 
@@ -51,8 +50,7 @@ def run_test(pdf_path: str = None, author: str = None, book_title: str = None):
         "cleaned_text": "",
         "sentences": [],
     }
-    langfuse_handler = models.get_langfuse_handler()
-    out = app.invoke(initial_state, config={"callbacks": [langfuse_handler]} if langfuse_handler else {})
+    out = app.invoke(initial_state)
 
     raw_text = out.get("raw_text", "")
     raw_chunks = out.get("raw_chunks", [])

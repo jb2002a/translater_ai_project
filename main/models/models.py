@@ -1,18 +1,11 @@
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langfuse.langchain import CallbackHandler as LangfuseCallbackHandler
 from dotenv import load_dotenv
 import os
 
 load_dotenv()  # Load environment variables from .env file
 
-
-def get_langfuse_handler():
-    """Langfuse 콜백 핸들러. LLM invoke 시 config={"callbacks": [get_langfuse_handler()]} 로 전달하면 트레이싱됨.
-    LANGFUSE_SECRET_KEY가 없으면 None을 반환해 트레이싱 없이 동작(401 방지)."""
-    if not os.getenv("LANGFUSE_SECRET_KEY"):
-        return None
-    return LangfuseCallbackHandler()
+# LangSmith: LANGCHAIN_TRACING_V2=true, LANGSMITH_API_KEY 설정 시 자동 트레이싱 (콜백 불필요)
 
 
 # for post-processing

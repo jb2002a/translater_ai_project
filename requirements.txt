@@ -1,5 +1,5 @@
 SoMaJo>=2.0.0
-langfuse
+langsmith
 langchain
 langchain-core
 langchain-anthropic
