@@ -10,6 +10,43 @@ from ...models import models
 
 load_dotenv()
 
+# Gemini 기준 대략 4자당 1토큰 (배치 용도 추정)
+DEFAULT_CHARS_PER_TOKEN = 4
+
+
+def _estimate_tokens(text: str, chars_per_token: int = DEFAULT_CHARS_PER_TOKEN) -> int:
+    return max(1, len(text) // chars_per_token)
+
+
+def rebatch_chunks_by_tokens(
+    raw_chunks: list[str],
+    max_tokens: int = 50_000,
+    chars_per_token: int = DEFAULT_CHARS_PER_TOKEN,
+) -> list[str]:
+    """
+    raw_chunks를 토큰 수 기준으로 묶어, 배치당 max_tokens 이하인 문자열 리스트로 반환.
+    순서 유지, 그리디 first-fit. 반환값은 배치별로 '\n'.join된 문자열 리스트.
+    """
+    if not raw_chunks:
+        return []
+    batches: list[list[str]] = []
+    current_batch: list[str] = []
+    current_tokens = 0
+
+    for chunk in raw_chunks:
+        chunk_tokens = _estimate_tokens(chunk, chars_per_token)
+        if current_tokens + chunk_tokens > max_tokens and current_batch:
+            batches.append(current_batch)
+            current_batch = []
+            current_tokens = 0
+        current_batch.append(chunk)
+        current_tokens += chunk_tokens
+
+    if current_batch:
+        batches.append(current_batch)
+
+    return ["\n".join(batch) for batch in batches]
+
 
 # 전처리 함수 (단일 텍스트)
 # config가 있으면 그래프에서 내려온 콜백 사용(중복 트레이싱 방지), 없으면 여기서 핸들러 생성
