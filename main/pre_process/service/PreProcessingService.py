@@ -111,11 +111,10 @@ def cleanup_chunks_parallel(raw_chunks: list[str], max_workers: int = MAX_CLEANU
     return cleaned_list
 
 
-# 데이터베이스에 저장하는 함수
-def save_to_db(pdf_path, author, book_title, sentences):
+# 데이터베이스에 저장하는 함수 (db_path는 state에서 전달받음)
+def save_to_db(pdf_path, author, book_title, sentences, db_path):
     try:
-        conn = sqlite3.connect("philosophy_translation.db")
-        ensure_korean_sentence_column("philosophy_translation.db")
+        conn = sqlite3.connect(db_path)
         cur = conn.cursor()
         # status는 pending, translated, approved 중 하나 / 대기, 번역 완료, 유저 승인전
         cur.execute(
@@ -144,28 +143,4 @@ def save_to_db(pdf_path, author, book_title, sentences):
         conn.commit()
         conn.close()
     except sqlite3.Error as e:
-        raise DatabaseError("DB 저장 실패 (philosophy_translation.db)", cause=e) from e
-
-
-def ensure_korean_sentence_column(db_path: str = "philosophy_translation.db") -> None:
-    """
-    기존 DB에 korean_sentence 칼럼이 없으면 ALTER TABLE로 추가.
-    테이블이 아직 없으면 무시(신규 DB는 save_to_db의 CREATE TABLE에서 처리).
-    """
-    try:
-        conn = sqlite3.connect(db_path)
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='processed_sentences'"
-        )
-        if cur.fetchone() is None:
-            conn.close()
-            return
-        cur.execute("PRAGMA table_info(processed_sentences)")
-        columns = [row[1] for row in cur.fetchall()]
-        if "korean_sentence" not in columns:
-            cur.execute("ALTER TABLE processed_sentences ADD COLUMN korean_sentence TEXT")
-            conn.commit()
-        conn.close()
-    except sqlite3.Error as e:
-        raise DatabaseError(f"DB 마이그레이션 실패: {db_path}", cause=e) from e
+        raise DatabaseError(f"DB 저장 실패 ({db_path})", cause=e) from e

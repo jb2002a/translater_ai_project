@@ -72,8 +72,9 @@ def save_db_node(state: GraphState):
         author = _require(state, "author")
         book_title = _require(state, "book_title")
         sentences = _require(state, "german_sentences")
-        save_to_db(pdf_path, author, book_title, sentences)
-        return {"db_status": "saved"}
+        db_path = _require(state, "db_path")
+        save_to_db(pdf_path, author, book_title, sentences, db_path)
+        return 
     except TranslaterAIError:
         raise
     except KeyError as e:
