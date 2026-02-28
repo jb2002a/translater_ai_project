@@ -86,7 +86,7 @@ def cleanup_chunks_parallel(raw_chunks: list[str], max_workers: int = MAX_CLEANU
     - 동작: 각 청크에 대해 cleanup_text(탈하이픈, 정서법, 노이즈 제거 등)를
       ThreadPoolExecutor로 동시에 호출하고, 원본 순서를 유지한 리스트로 반환.
     - 반환: 청크 순서대로 정리된 문자열 리스트. cleanup_node에서 그대로
-      state["sentences"]로 넣고 save_db_node에서 사용.
+      state["german_sentences"]로 넣고 save_db_node에서 사용.
     """
     if not raw_chunks:
         return []

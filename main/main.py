@@ -58,8 +58,8 @@ if __name__ == "__main__":
     # Run the workflow (LangSmith: LANGCHAIN_TRACING_V2=true 시 자동 트레이싱)
     final_output = app.invoke(initial_state)
 
-    # flatten_sentences 결과 청크(sentences) 상위 100개 idx : value 형식으로 텍스트 파일 저장
-    chunks = final_output.get("sentences", [])
+    # flatten_sentences 결과 청크(german_sentences) 상위 100개 idx : value 형식으로 텍스트 파일 저장
+    chunks = final_output.get("german_sentences", [])
     out_path = Path(__file__).resolve().parent.parent / "flatten_sentences_top100.txt"
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(f"# flatten_sentences 결과 청크 수: {len(chunks)}, 상위 100개\n\n")

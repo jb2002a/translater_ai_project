@@ -50,7 +50,7 @@ def cleanup_node(state: GraphState):
         raise InvalidStateError(f"필수 state 키 누락: {e}") from e
 
 
-# chunking_node와 동일하게 segment_raw_to_list로 청크별 문장 분리 후 sentences로 반환
+# chunking_node와 동일하게 segment_raw_to_list로 청크별 문장 분리 후 german_sentences로 반환
 def flatten_sentences_node(state: GraphState):
     try:
         cleaned_batches = _require(state, "cleaned_batches")
@@ -58,20 +58,20 @@ def flatten_sentences_node(state: GraphState):
         for chunk in cleaned_batches:
             raw_list = segment_raw_to_list(chunk)
             sentences.extend([s.strip() for s in raw_list if s.strip()])
-        return {"sentences": sentences}
+        return {"german_sentences": sentences}
     except TranslaterAIError:
         raise
     except KeyError as e:
         raise InvalidStateError(f"필수 state 키 누락: {e}") from e
 
 
-# flatten_sentences_node에서 나온 문장 리스트를 데이터베이스에 저장
+# flatten_sentences_node에서 나온 문장 리스트(german_sentences)를 데이터베이스에 저장
 def save_db_node(state: GraphState):
     try:
         pdf_path = _require(state, "pdf_path")
         author = _require(state, "author")
         book_title = _require(state, "book_title")
-        sentences = _require(state, "sentences")
+        sentences = _require(state, "german_sentences")
         save_to_db(pdf_path, author, book_title, sentences)
         return {"db_status": "saved"}
     except TranslaterAIError:

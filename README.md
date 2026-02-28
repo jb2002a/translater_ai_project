@@ -32,7 +32,7 @@
 translater_ai_project/
 ├── main/
 │   ├── main.py                 # LangGraph 워크플로우 정의 (extract → chunking → cleanup → save_db)
-│   ├── TranslationState.py     # GraphState (pdf_path, author, book_title, raw_text, raw_chunks, sentences 등)
+│   ├── TranslationState.py     # GraphState (pdf_path, author, book_title, raw_text, raw_chunks, german_sentences 등)
 │   ├── models/
 │   │   └── models.py           # LLM 래퍼 (Google Gemini: 전처리, Anthropic Claude: 번역)
 │   ├── pre_process/

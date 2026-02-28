@@ -9,8 +9,4 @@ class GraphState(TypedDict, total=False):
     raw_chunks: List[str]
     batched_chunks: List[str]
     cleaned_batches: List[str]
-    sentences: List[str]
-    db_status: str
-    db_path: str
-    translation_status: str
-    translated_count: int
+    german_sentences: List[str]
