@@ -14,12 +14,24 @@ Tasks:
 
 3. Metadata & Noise Removal: Identify and remove ALL of the following non-textual elements:
    - Page numbers, running headers, and footers.
-   - Bibliographic series indicators (e.g., "Diltheys Schriften", "Gesammelte Werke").
-   - Chapter and section headings in ALL CAPS: when a block of ALL-CAPS text appears immediately before normal German prose, remove ONLY the ALL-CAPS heading and keep the prose that follows.
+   - Bibliographic series indicators (e.g., "Diltheys Schriften", "Gesammelte Werke", "Band I", "Bd. II").
+
+   - Chapter/section headings in ALL CAPS: when a block of ALL-CAPS text appears immediately before normal German prose, remove ONLY the ALL-CAPS heading and keep the prose that follows.
      Example: "VIERTES KAPITEL DIE ENTSTEHUNG DER WISSENSCHAFT IN EUROPA Der geschichtliche Verlauf..." → "Der geschichtliche Verlauf..."
      Example: "SIEBENTES KAPITEL DIE METAPHYSIK DER GRIECHEN UND DIE GESELLSCHAFTLICH-GESCHICHTLICHE WIRKLICHKEIT Das Verhältnis..." → "Das Verhältnis..."
-   - Editorial notes and bracketed interpolations that interrupt the narrative flow.
-   - Footnote reference symbols: remove all inline occurrences of "^", "*", "†", "‡" that serve as footnote markers within or at the end of sentences.
+
+   - Chapter/section headings in Title Case or Sentence Case: headings written in mixed case that function as structural markers — typically a book/chapter ordinal followed by a descriptive noun phrase WITH NO MAIN VERB.
+     Patterns to remove: "Erstes [einleitendes] Buch ...", "Zweites Kapitel ...", "Drittes Buch ...", "Vierter Abschnitt ...", "§ [number] ...", ordinal + "Kapitel/Buch/Abschnitt/Teil" combinations.
+     Example: "Erstes einleitendes Buch die Aufgabe der allgemeinen Rechtswissenschaft" → remove entirely (no main verb present → it is a heading, not prose).
+     CRITICAL — Embedded headings: If a title-case heading appears MID-SENTENCE (splitting a main clause), remove the heading and re-join the surrounding prose to restore the original sentence.
+     Example: "...lassen, dass Erstes einleitendes Buch die Aufgabe der allgemeinen Rechtswissenschaft auch in der Form des Naturrechts gelöst werde; aber..." → "...lassen, dass die Aufgabe der allgemeinen Rechtswissenschaft auch in der Form des Naturrechts gelöst werde; aber..."
+
+   - Editorial interjections and author's footnote bodies embedded in the main text: passages that begin with meta-commentary trigger phrases and interrupt the narrative flow. These are footnote or endnote bodies mistakenly merged into the surrounding prose.
+     Remove the ENTIRE passage (from trigger phrase to the end of that footnote's last sentence) when it starts with any of:
+       "Um Missverständnisse zu verhüten", "Ich bemerke", "Es sei bemerkt", "Anm. d. Hrsg.", "Anmerkung:", "N.B.:", "Nota bene:", "Hierzu ist anzumerken:", "Diese Argumentation ist"
+     Example: "...erscheinen lassen, dass Um Missverständnisse zu verhüten, merke ich an: Von dieser naturrechtlichen Theorie muss die andere ganz abgetrennt werden, ... hinterlassen hat. die Aufgabe..." → remove the entire interjection from "Um Missverständnisse" through "hinterlassen hat." and keep only the surrounding main-clause text.
+
+   - Footnote reference markers: remove all inline occurrences of "^", "*", "†", "‡", Unicode superscript digits (¹ ² ³ ⁴ ...), and parenthetical/bracketed footnote numbers (e.g., "(1)", "[2]") that serve as footnote markers within or at the end of sentences.
    - Inline academic citations and footnote bodies: remove "Arist.", "Metaph.", "Phys.", "p. [number]", "ibid.", "a.a.O.", "op. cit.", "vgl.", "cf.", and any block of Latin/Greek text not enclosed in quotation marks that functions as an editorial footnote (e.g., "dargelegt: conservatio rerum a Deo...", "XII, 8 p. 1073b 4.", "Schol. p. 487a", "* Diese Argumentation ist...").
    - Index and register content: if the text consists primarily of proper names followed by comma-separated page numbers (Personenregister, Sachregister), remove it entirely.
    - Em-dash (—) at the very start of a text block used solely as a paragraph-opening marker: remove the leading "—" and trim surrounding whitespace. Do NOT remove em-dashes that connect two clauses within a sentence.
@@ -30,6 +42,6 @@ Output Constraints:
 - Output the cleaned German text ONLY.
 - No introductory remarks, metadata, or explanations.
 - Do not add, translate, summarize, complete, or invent text. Do not guess uncertain characters.
-- If the entire input is noise (index entries, footnote-only text, single characters, or an ALL-CAPS heading with no prose following it), output an empty string.
+- If the entire input is noise (index entries, footnote-only text, single characters, or a heading with no prose following it), output an empty string.
 - CRITICAL: The output must contain no newline characters (\\n). Produce a single continuous block of text with single spaces between words.
 """
