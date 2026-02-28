@@ -8,14 +8,14 @@ if str(_root) not in sys.path:
 import config
 
 from langgraph.graph import StateGraph, END
-from .pre_process.node.ExtractNode import extract_node
-from .pre_process.node.PreProcessingNode import (
+from main.pre_process.node.ExtractNode import extract_node
+from main.pre_process.node.PreProcessingNode import (
     cleanup_node,
     chunking_node,
     save_db_node,
 )
-from .TranslationState import GraphState
-from .pre_process.service.Utils import read_from_db, generate_text_file_du
+from main.TranslationState import GraphState
+from main.pre_process.service.Utils import read_from_db, generate_text_file_du
 
 
 def create_workflow():
