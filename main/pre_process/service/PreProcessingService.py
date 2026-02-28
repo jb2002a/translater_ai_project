@@ -20,21 +20,16 @@ load_dotenv()
 # Gemini 기준 대략 4자당 1토큰 (배치 용도 추정)
 DEFAULT_CHARS_PER_TOKEN = 4
 
-
+#토큰 계산용 함수
 def _estimate_tokens(text: str, chars_per_token: int = DEFAULT_CHARS_PER_TOKEN) -> int:
     return max(1, len(text) // chars_per_token)
 
-
+# Api 호출을 위한 재 청킹 로직(출력 토큰 제한으로 잘리므로 5만 토큰 단위로 배치 묶기)
 def rebatch_chunks_by_tokens(
     raw_chunks: list[str],
     max_tokens: int = 50_000,
     chars_per_token: int = DEFAULT_CHARS_PER_TOKEN,
 ) -> list[str]:
-    """
-    raw_chunks를 토큰 수 기준으로 묶어, 배치당 max_tokens 이하인 문자열 리스트로 반환.
-    순서 유지, 그리디 first-fit. 각 청크(문장)에는 이미 줄바꿈이 포함되어 있으므로
-    배치 합칠 때 구분자 없이 이어붙여 반환.
-    """
     if not raw_chunks:
         return []
     batches: list[list[str]] = []
@@ -91,22 +86,19 @@ def cleanup_chunks_parallel(raw_chunks: list[str]) -> list[str]:
     def process(i: int, chunk: str):
         return i, cleanup_text(chunk)
 
-    # cleanup 노드는 1회 실행되며, 내부에서 청크별 cleanup_text(LLM)를 병렬 호출.
-    # LangSmith: 이 구간은 트레이싱 제외 (랭그래프만 추적)
-    with langsmith.tracing_context(enabled=False):
-        with ThreadPoolExecutor() as executor:
-            futures = {executor.submit(process, i, c): i for i, c in enumerate(raw_chunks)}
-            for fut in as_completed(futures):
-                try:
-                    i, content = fut.result()
-                    cleaned_list[i] = content
-                except Exception as e:
-                    idx = futures.get(fut)
-                    raise CleanupChunkError(
-                        f"청크 cleanup 실패 (chunk_index={idx})",
-                        chunk_index=idx,
-                        cause=e,
-                    ) from e
+    with ThreadPoolExecutor() as executor:
+        futures = {executor.submit(process, i, c): i for i, c in enumerate(raw_chunks)}
+        for fut in as_completed(futures):
+            try:
+                i, content = fut.result()
+                cleaned_list[i] = content
+            except Exception as e:
+                idx = futures.get(fut)
+                raise CleanupChunkError(
+                    f"청크 cleanup 실패 (chunk_index={idx})",
+                    chunk_index=idx,
+                    cause=e,
+                ) from e
     return cleaned_list
 
 
