@@ -55,4 +55,11 @@ if __name__ == "__main__":
     final_output = app.invoke(initial_state)
     print(f"Workflow Status: {final_output.get('db_status')}")
 
+    # save_to_db로 저장한 DB에서 문장 목록 읽어서 출력
+    DB_PATH = "philosophy_translation.db"
+    sentences = read_from_db(DB_PATH)
+    print(f"\n[DB 조회 결과] 저장된 문장 수: {len(sentences)}")
+    for i, s in enumerate(sentences[:30], 1):
+        print(f"  {i}. {s}")
+
 
