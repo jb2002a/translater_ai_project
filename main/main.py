@@ -17,7 +17,7 @@ from main.pre_process.node.PreProcessingNode import (
     save_db_node,
 )
 from main.TranslationState import GraphState
-from main.pre_process.service.Utils import read_from_db, generate_text_file_du
+from main.pre_process.service.Utils import generate_text_file_du
 
 
 def create_workflow():
@@ -35,8 +35,10 @@ def create_workflow():
     workflow.add_edge("chunking", "re_chunking")
     workflow.add_edge("re_chunking", "cleanup")
     workflow.add_edge("cleanup", "flatten_sentences")
-    workflow.add_edge("flatten_sentences", "save_db")
-    workflow.add_edge("save_db", END)
+    workflow.add_edge("flatten_sentences", END)
+    # save_db 노드 제외: flatten_sentences 까지만 실행
+    # workflow.add_edge("flatten_sentences", "save_db")
+    # workflow.add_edge("save_db", END)
 
     return workflow.compile()
 
@@ -52,14 +54,15 @@ if __name__ == "__main__":
     }
 
     # Run the workflow (LangSmith: LANGCHAIN_TRACING_V2=true 시 자동 트레이싱)
+    # save_db 노드 제외, flatten_sentences 까지만 실행
     final_output = app.invoke(initial_state)
-    print(f"Workflow Status: {final_output.get('db_status')}")
 
-    # save_to_db로 저장한 DB에서 문장 목록 읽어서 출력
-    DB_PATH = "philosophy_translation.db"
-    sentences = read_from_db(DB_PATH)
-    print(f"\n[DB 조회 결과] 저장된 문장 수: {len(sentences)}")
-    for i, s in enumerate(sentences[:30], 1):
-        print(f"  {i}. {s}")
+    # flatten_sentences 결과 청크(sentences) 상위 100개 idx : value 형식으로 텍스트 파일 저장
+    chunks = final_output.get("sentences", [])
+    out_path = Path(__file__).resolve().parent.parent / "flatten_sentences_top100.txt"
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(f"# flatten_sentences 결과 청크 수: {len(chunks)}, 상위 100개\n\n")
+        for idx, value in enumerate(chunks[:100]):
+            f.write(f"{idx} : {value}\n")
 
 

@@ -24,10 +24,10 @@ DEFAULT_CHARS_PER_TOKEN = 4
 def _estimate_tokens(text: str, chars_per_token: int = DEFAULT_CHARS_PER_TOKEN) -> int:
     return max(1, len(text) // chars_per_token)
 
-# Api 호출을 위한 재 청킹 로직(출력 토큰 제한으로 잘리므로 5만 토큰 단위로 배치 묶기)
+# Api 호출을 위한 재 청킹 로직(출력 토큰 제한으로 잘리므로 3만 토큰 단위로 배치 묶기)
 def rebatch_chunks_by_tokens(
     raw_chunks: list[str],
-    max_tokens: int = 50_000,
+    max_tokens: int = 30_000,
     chars_per_token: int = DEFAULT_CHARS_PER_TOKEN,
 ) -> list[str]:
     if not raw_chunks:
@@ -61,7 +61,13 @@ def cleanup_text(text):
     try:
         chat = models.get_chat_model_google()
         processed_text = chat.invoke(messages)
-        return processed_text.content
+        content = processed_text.content
+        # AIMessage.content는 str 또는 list(멀티모달 등)일 수 있음
+        if isinstance(content, list):
+            content = " ".join(
+                (c.get("text", c) if isinstance(c, dict) else str(c)) for c in content
+            )
+        return content if isinstance(content, str) else str(content)
     except TranslaterAIError:
         raise
     except Exception as e:

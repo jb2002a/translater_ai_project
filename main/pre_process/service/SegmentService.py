@@ -6,6 +6,9 @@ from ...exceptions import SegmentError
 
 # SoMaJo 기반 문장 경계 분리
 def segment_raw_to_list(text: str) -> List[str]:
+    # LLM 등에서 list가 넘어올 수 있음: 한 문자열로 정규화
+    if isinstance(text, list):
+        text = " ".join(str(t) for t in text)
     if not text or not text.strip():
         return []
     try:
