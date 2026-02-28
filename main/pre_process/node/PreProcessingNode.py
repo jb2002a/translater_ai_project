@@ -50,14 +50,14 @@ def cleanup_node(state: GraphState):
         raise InvalidStateError(f"필수 state 키 누락: {e}") from e
 
 
-# cleaned_batches를 합친 뒤 SoMaJo로 문장 경계 재분리 → 문장 단위 리스트
-# (\n 기준 split은 PDF/LLM의 줄 단위 줄바꿈 때문에 조각이 나오므로, 정규 문장 분리 사용)
+# chunking_node와 동일하게 segment_raw_to_list로 청크별 문장 분리 후 sentences로 반환
 def flatten_sentences_node(state: GraphState):
     try:
         cleaned_batches = _require(state, "cleaned_batches")
-        merged = "".join(cleaned_batches)
-        raw_list = segment_raw_to_list(merged)
-        sentences = [s.strip() for s in raw_list if s.strip()]
+        sentences = []
+        for chunk in cleaned_batches:
+            raw_list = segment_raw_to_list(chunk)
+            sentences.extend([s.strip() for s in raw_list if s.strip()])
         return {"sentences": sentences}
     except TranslaterAIError:
         raise
