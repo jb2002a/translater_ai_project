@@ -26,11 +26,11 @@ def chunking_node(state: GraphState):
         raise InvalidStateError(f"필수 state 키 누락: {e}") from e
 
 
-# 청크 재정립: clean-up을 위해 5만 토큰 단위로 배치 묶기
+# 청크 재정립: clean-up을 위해 1.5만 토큰 단위로 배치 묶기
 def re_chunking_node(state: GraphState):
     try:
         raw_chunks = _require(state, "raw_chunks")
-        batched_chunks = rebatch_chunks_by_tokens(raw_chunks, max_tokens=50_000)
+        batched_chunks = rebatch_chunks_by_tokens(raw_chunks, max_tokens=15_000)
         return {"batched_chunks": batched_chunks}
     except TranslaterAIError:
         raise

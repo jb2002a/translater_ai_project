@@ -3,7 +3,7 @@
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dotenv import load_dotenv
-import langsmith
+import langsmith as ls
 from langchain_core.messages import SystemMessage, HumanMessage
 from ..prompts.prompts import GERMAN_OCR_RESTORATION_PROMPT
 import sqlite3
@@ -24,10 +24,10 @@ DEFAULT_CHARS_PER_TOKEN = 4
 def _estimate_tokens(text: str, chars_per_token: int = DEFAULT_CHARS_PER_TOKEN) -> int:
     return max(1, len(text) // chars_per_token)
 
-# Api 호출을 위한 재 청킹 로직(출력 토큰 제한으로 잘리므로 3만 토큰 단위로 배치 묶기)
+# Api 호출을 위한 재 청킹 로직(출력 토큰 제한 고려, 1.5만 토큰 단위로 배치 묶기)
 def rebatch_chunks_by_tokens(
     raw_chunks: list[str],
-    max_tokens: int = 30_000,
+    max_tokens: int = 15_000,
     chars_per_token: int = DEFAULT_CHARS_PER_TOKEN,
 ) -> list[str]:
     if not raw_chunks:
@@ -60,7 +60,8 @@ def cleanup_text(text):
     ]
     try:
         chat = models.get_chat_model_google()
-        processed_text = chat.invoke(messages)
+        with ls.tracing_context(enabled=False):
+            processed_text = chat.invoke(messages)
         content = processed_text.content
         # AIMessage.content는 str 또는 list(멀티모달 등)일 수 있음
         if isinstance(content, list):
@@ -74,7 +75,9 @@ def cleanup_text(text):
         raise LLMProviderError("Google LLM cleanup 호출 실패", cause=e) from e
 
 
-def cleanup_chunks_parallel(raw_chunks: list[str]) -> list[str]:
+MAX_CLEANUP_WORKERS = 20
+
+def cleanup_chunks_parallel(raw_chunks: list[str], max_workers: int = MAX_CLEANUP_WORKERS) -> list[str]:
     """
     청크 리스트를 병렬로 cleanup한 뒤, 원본 순서대로 정리된 문자열 리스트를 반환.
 
@@ -92,7 +95,7 @@ def cleanup_chunks_parallel(raw_chunks: list[str]) -> list[str]:
     def process(i: int, chunk: str):
         return i, cleanup_text(chunk)
 
-    with ThreadPoolExecutor() as executor:
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(process, i, c): i for i, c in enumerate(raw_chunks)}
         for fut in as_completed(futures):
             try:

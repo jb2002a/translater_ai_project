@@ -26,5 +26,8 @@ def get_chat_model_google():
     if not api_key:
         raise MissingConfigError("GOOGLE_API_KEY 환경변수가 설정되지 않았습니다.")
     return ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash", api_key=api_key
+        model="gemini-2.5-flash",
+        api_key=api_key,
+        max_output_tokens=65536,
+        thinking_budget=0,
     )

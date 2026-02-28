@@ -35,10 +35,8 @@ def create_workflow():
     workflow.add_edge("chunking", "re_chunking")
     workflow.add_edge("re_chunking", "cleanup")
     workflow.add_edge("cleanup", "flatten_sentences")
-    workflow.add_edge("flatten_sentences", END)
-    # save_db 노드 제외: flatten_sentences 까지만 실행
-    # workflow.add_edge("flatten_sentences", "save_db")
-    # workflow.add_edge("save_db", END)
+    workflow.add_edge("flatten_sentences", "save_db")
+    workflow.add_edge("save_db", END)
 
     return workflow.compile()
 
@@ -54,7 +52,6 @@ if __name__ == "__main__":
     }
 
     # Run the workflow (LangSmith: LANGCHAIN_TRACING_V2=true 시 자동 트레이싱)
-    # save_db 노드 제외, flatten_sentences 까지만 실행
     final_output = app.invoke(initial_state)
 
     # flatten_sentences 결과 청크(sentences) 상위 100개 idx : value 형식으로 텍스트 파일 저장
@@ -62,7 +59,7 @@ if __name__ == "__main__":
     out_path = Path(__file__).resolve().parent.parent / "flatten_sentences_top100.txt"
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(f"# flatten_sentences 결과 청크 수: {len(chunks)}, 상위 100개\n\n")
-        for idx, value in enumerate(chunks[:100]):
+        for idx, value in enumerate(chunks[100:200]):
             f.write(f"{idx} : {value}\n")
 
 
