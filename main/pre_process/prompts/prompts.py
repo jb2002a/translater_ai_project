@@ -12,10 +12,10 @@ Tasks:
    - Page numbers, headers, and footers.
    - Bibliographic series indicators (e.g., "Diltheys Schriften", "Gesammelte Werke").
    - Volume/Chapter markers and editorial notes that interrupt the narrative flow.
-4. Formatting: Strip all internal line breaks and tabs. Output the entire result as one single, continuous string of text with single spacing between words.
+4. Formatting: Strip internal tabs only. Preserve all line breaks (\n) exactly as in the source—never remove, merge, or clean up newline characters. Use single spacing between words where appropriate.
 
 Output Constraints:
 - Output the cleaned German text ONLY.
 - No introductory remarks, metadata, or explanations.
-- No line breaks in the output.
+- CRITICAL: Do NOT clean up or remove any newline characters (\n). They must be preserved in the output exactly as they appear in the input.
 """
