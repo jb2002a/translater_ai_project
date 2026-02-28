@@ -9,28 +9,23 @@ from ...exceptions import DatabaseError
 def fetch_pending_sentences(
     db_path: str,
     *,
-    author: str | None = None,
-    book_title: str | None = None,
+    author: str,
+    book_title: str,
     limit: int | None = None,
 ) -> List[Tuple[int, str]]:
     """
     status='pending'인 문장들을 (id, german_sentence) 형태로 id 순으로 조회.
-    author, book_title 지정 시 해당 메타데이터로 필터링.
+    author, book_title으로 필터링.
     """
     try:
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
         sql = (
-            "SELECT id, german_sentence FROM processed_sentences WHERE status = ?"
+            "SELECT id, german_sentence FROM processed_sentences "
+            "WHERE status = ? AND author = ? AND book_title = ?"
         )
-        params: list = ["pending"]
-        if author is not None:
-            sql += " AND author = ?"
-            params.append(author)
-        if book_title is not None:
-            sql += " AND book_title = ?"
-            params.append(book_title)
+        params: list = ["pending", author, book_title]
         sql += " ORDER BY id"
         if limit is not None:
             sql += " LIMIT ?"
