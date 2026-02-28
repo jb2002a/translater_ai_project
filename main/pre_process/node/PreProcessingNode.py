@@ -14,7 +14,7 @@ def _require(state: GraphState, key: str):
     return state[key]
 
 
-# SoMaJo로 raw_text를 문장 단위 청크 리스트로 분리 (cleanup 병렬화를 위해 선행)
+# SoMaJo로 raw_text를 문장 단위 청크 리스트로 분리, 청크 끝에 \n 추가
 def chunking_node(state: GraphState):
     try:
         raw_text = _require(state, "raw_text")
@@ -26,12 +26,36 @@ def chunking_node(state: GraphState):
         raise InvalidStateError(f"필수 state 키 누락: {e}") from e
 
 
-# 청크 재정립(5만 토큰 단위) 후 병렬 cleanup → sentences 리스트 그대로
-def cleanup_node(state: GraphState):
+# 청크 재정립: clean-up을 위해 5만 토큰 단위로 배치 묶기
+def re_chunking_node(state: GraphState):
     try:
         raw_chunks = _require(state, "raw_chunks")
         batched_chunks = rebatch_chunks_by_tokens(raw_chunks, max_tokens=50_000)
-        sentences = cleanup_chunks_parallel(batched_chunks)
+        return {"batched_chunks": batched_chunks}
+    except TranslaterAIError:
+        raise
+    except KeyError as e:
+        raise InvalidStateError(f"필수 state 키 누락: {e}") from e
+
+
+# re_chunking_node에서 나온 배치별 문장 리스트를 병렬로 cleanup
+def cleanup_node(state: GraphState):
+    try:
+        batched_chunks = _require(state, "batched_chunks")
+        cleaned_batches = cleanup_chunks_parallel(batched_chunks)
+        return {"cleaned_batches": cleaned_batches}
+    except TranslaterAIError:
+        raise
+    except KeyError as e:
+        raise InvalidStateError(f"필수 state 키 누락: {e}") from e
+
+
+# cleaned_batches를 합친 뒤 \n 기준으로 재청킹 → 문장 단위 리스트
+def flatten_sentences_node(state: GraphState):
+    try:
+        cleaned_batches = _require(state, "cleaned_batches")
+        merged = "".join(cleaned_batches)
+        sentences = [s for s in merged.split("\n") if s]
         return {"sentences": sentences}
     except TranslaterAIError:
         raise
@@ -39,7 +63,7 @@ def cleanup_node(state: GraphState):
         raise InvalidStateError(f"필수 state 키 누락: {e}") from e
 
 
-# 데이터베이스 저장 노드
+# flatten_sentences_node에서 나온 문장 리스트를 데이터베이스에 저장
 def save_db_node(state: GraphState):
     try:
         pdf_path = _require(state, "pdf_path")
