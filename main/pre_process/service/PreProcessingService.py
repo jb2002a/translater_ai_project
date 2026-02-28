@@ -48,8 +48,8 @@ def rebatch_chunks_by_tokens(
     if current_batch:
         batches.append(current_batch)
 
-    # 각 raw_chunk(문장)에 이미 SegmentService에서 \n이 붙어 있으므로 구분자 없이 이어붙임
-    return ["".join(batch) for batch in batches]
+    # 문장 사이를 공백 하나로 이어붙여 한 배치 문자열로 만듦 (flatten 시 재분할 용이)
+    return [" ".join(batch) for batch in batches]
 
 
 # 단일 텍스트 cleanup (LLM 호출). LangSmith는 env 설정으로 자동 트레이싱.
