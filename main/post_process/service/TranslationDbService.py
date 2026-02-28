@@ -1,7 +1,7 @@
 # This module provides DB access for the translation post-process (fetch/store sentences).
 
 import sqlite3
-from typing import List, Tuple, Any
+from typing import Dict, List, Tuple, Any
 
 from ...exceptions import DatabaseError
 
@@ -17,48 +17,47 @@ def fetch_german_sentences_within_tokens(
     state: Any,
     max_tokens: int = 5000,
     chars_per_token: int = DEFAULT_CHARS_PER_TOKEN,
-) -> Tuple[List[str], int]:
+) -> Tuple[List[Tuple[int, str]], Dict[str, Any]]:
     """
     state에서 current_pk를 꺼내와, 해당 pk부터 german_sentence를 조회하며
     누적 토큰이 max_tokens 이내가 될 때까지 문장 리스트를 채워 반환한다.
-    db_path는 state에서 가져온다.
 
     Returns:
-        (german_sentences, next_pk): 가져온 문장 리스트와, 다음 배치 시작할 pk.
+        (items, state_updates): (pk, german_sentence) 튜플 리스트와 state 업데이트 딕셔너리.
+        state_updates에 current_pk가 포함되며, 호출측에서 반영한다.
     """
     db_path = state.get("db_path")
     current_pk = state.get("current_pk")
     try:
-        conn = sqlite3.connect(db_path)
-        cur = conn.cursor()
-        cur.execute(
-            """
-            SELECT id, german_sentence
-            FROM processed_sentences
-            WHERE id >= ?
-            ORDER BY id
-            """,
-            (current_pk,),
-        )
-        rows = cur.fetchall()
-        conn.close()
+        with sqlite3.connect(db_path) as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT id, german_sentence
+                FROM processed_sentences
+                WHERE id >= ?
+                ORDER BY id
+                """,
+                (current_pk,),
+            )
+            rows = cur.fetchall()
     except sqlite3.Error as e:
         raise DatabaseError(f"DB 조회 실패: {db_path}", cause=e) from e
 
     items: List[Tuple[int, str]] = []
     total_tokens = 0
-    next_pk = current_pk
+    next_pk: int | None = None
 
     for row_id, german_sentence in rows:
         sentence = german_sentence or ""
         chunk_tokens = _estimate_tokens(sentence, chars_per_token)
-        if total_tokens + chunk_tokens > max_tokens and items:
+        total_tokens += chunk_tokens
+        if total_tokens > max_tokens and items:
             next_pk = row_id
             break
         items.append((row_id, sentence))
-        total_tokens += chunk_tokens
+    else:
+        if items:
+            next_pk = items[-1][0] + 1
 
-    if items and next_pk == current_pk:
-        next_pk = items[-1][0] + 1
-    german_sentences = [s for _, s in items]
-    return german_sentences, next_pk
+    return items, {"current_pk": next_pk}
