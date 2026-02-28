@@ -61,3 +61,30 @@ def fetch_german_sentences_within_tokens(
             next_pk = items[-1][0] + 1
 
     return items, {"current_pk": next_pk}
+
+
+def save_translations_to_db(
+    db_path: str,
+    translations: List[Tuple[int, str]],
+) -> None:
+    """
+    번역된 한국어 문장을 processed_sentences 테이블에 업데이트한다.
+
+    Args:
+        db_path: SQLite DB 경로
+        translations: (pk, korean_sentence) 튜플 리스트
+    """
+    try:
+        with sqlite3.connect(db_path) as conn:
+            cur = conn.cursor()
+            cur.executemany(
+                """
+                UPDATE processed_sentences
+                SET korean_sentence = ?
+                WHERE id = ?
+                """,
+                [(korean, pk) for pk, korean in translations],
+            )
+            conn.commit()
+    except sqlite3.Error as e:
+        raise DatabaseError(f"DB 저장 실패: {db_path}", cause=e) from e
