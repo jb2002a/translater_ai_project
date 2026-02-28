@@ -32,7 +32,8 @@ def rebatch_chunks_by_tokens(
 ) -> list[str]:
     """
     raw_chunks를 토큰 수 기준으로 묶어, 배치당 max_tokens 이하인 문자열 리스트로 반환.
-    순서 유지, 그리디 first-fit. 반환값은 배치별로 '\n'.join된 문자열 리스트.
+    순서 유지, 그리디 first-fit. 각 청크(문장)에는 이미 줄바꿈이 포함되어 있으므로
+    배치 합칠 때 구분자 없이 이어붙여 반환.
     """
     if not raw_chunks:
         return []
