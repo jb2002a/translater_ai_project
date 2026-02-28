@@ -16,6 +16,7 @@ from main.pre_process.node.PreProcessingNode import (
     re_chunking_node,
     save_db_node,
 )
+from main.post_process.node.TranslateNode import translate_node
 from main.TranslationState import GraphState
 from main.pre_process.service.Utils import generate_text_file_du
 
@@ -29,6 +30,7 @@ def create_workflow():
     workflow.add_node("cleanup", cleanup_node)
     workflow.add_node("flatten_sentences", flatten_sentences_node)
     workflow.add_node("save_db", save_db_node)
+    workflow.add_node("translate", translate_node)
 
     workflow.set_entry_point("extract")
     workflow.add_edge("extract", "chunking")
@@ -36,7 +38,8 @@ def create_workflow():
     workflow.add_edge("re_chunking", "cleanup")
     workflow.add_edge("cleanup", "flatten_sentences")
     workflow.add_edge("flatten_sentences", "save_db")
-    workflow.add_edge("save_db", END)
+    workflow.add_edge("save_db", "translate")
+    workflow.add_edge("translate", END)
 
     return workflow.compile()
 
@@ -49,6 +52,7 @@ if __name__ == "__main__":
         "pdf_path": config.DEFAULT_PDF_PATH,
         "author": "Dilthey, Wilhelm",
         "book_title": "Dilthey, Wilhelm: Einleitung in die Geisteswissenschaften. Versuch einer Grundlegung für das Studium der Gesellschaft und der Geschichte. Bd. 1. Leipzig, 1883",
+        "db_path": "philosophy_translation.db",
     }
 
     # Run the workflow (LangSmith: LANGCHAIN_TRACING_V2=true 시 자동 트레이싱)

@@ -11,3 +11,6 @@ class GraphState(TypedDict, total=False):
     cleaned_batches: List[str]
     sentences: List[str]
     db_status: str
+    db_path: str
+    translation_status: str
+    translated_count: int
