@@ -27,7 +27,7 @@ def initial_translate(
         chat = models.get_chat_model_anthropic()
         structured_chat = chat.with_structured_output(TranslationResult)
         system_prompt = TRANSLATION_PROMPT.format(AUTHOR=author, BOOK_TITLE=book_title)
-        human_message = f"pk: {pk}\n\n{text}"
+        human_message = f"pk: {pk}\n\n[번역 대상 텍스트]\n{text}"
         messages = [
             SystemMessage(content=system_prompt),
             HumanMessage(content=human_message),
