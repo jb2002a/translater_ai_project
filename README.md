@@ -40,18 +40,14 @@
 │  후처리 (post_process)                                                           │
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                 │
-│   ┌──────────────┐     pending 있음      ┌────────────┐     ┌─────────────────┐ │
-│   │fetch_sentences│ ──────────────────→ │  translate  │ ──→ │save_translations │ │
-│   └──────┬───────┘                      └──────┬──────┘     └────────┬──────────┘ │
-│          │                                     │                     │           │
-│          │ pending 없음                        │                     │           │
-│          ▼                                     │                     │           │
-│       [END]  ←─────────────────────────────────┴─────────────────────┘           │
-│          │         (루프: fetch → translate → save → fetch)                      │
-│          │                                                                      │
-│   - 5000토큰 단위로 DB 조회                                                     │
-│   - Claude로 문장별 번역                                                        │
-│   - korean_sentence 컬럼 업데이트                                               │
+│   [fetch_sentences] → [translate] → [save_translations] → [END]                 │
+│          │                    │                    │                           │
+│          ▼                    ▼                    ▼                           │
+│   current_pk부터         Claude로            korean_sentence                    │
+│   5000토큰 이내          문장별 번역           컬럼 업데이트                      │
+│   미번역 문장 조회                                                               │
+│                                                                                 │
+│   ※ 미번역 문장이 남아 있으면 스크립트를 반복 실행하여 배치별 번역 진행           │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -75,9 +71,9 @@
 
 | 노드 | 설명 | 입력 → 출력 |
 |------|------|-------------|
-| **fetch_sentences** | `current_pk`부터 5000토큰 이내 미번역 문장 조회 | state → `pending_items`, `current_pk` |
+| **fetch_sentences** | `current_pk`부터 5000토큰 이내 문장 조회 | state → `pending_items`, `current_pk` |
 | **translate** | Claude로 문장별 독일어→한국어 학술 번역 | `pending_items` → `translated_items` |
-| **save_translations** | `korean_sentence` 컬럼 업데이트 후 `fetch_sentences`로 재진입 | `translated_items` → DB |
+| **save_translations** | `korean_sentence` 컬럼 업데이트 | `translated_items` → DB |
 
 ---
 
@@ -88,6 +84,7 @@ translater_ai_project/
 ├── main/
 │   ├── TranslationState.py       # GraphState, PostTranslationState
 │   ├── exceptions.py             # 예외 클래스
+│   ├── read_db_sentences.py      # DB 문장 조회 스크립트 (id 1~100 출력)
 │   ├── models/
 │   │   └── models.py             # Gemini(전처리), Claude(번역) LLM 래퍼
 │   ├── pre_process/
@@ -108,10 +105,10 @@ translater_ai_project/
 │       │   └── TranslateNode.py
 │       ├── service/
 │       │   ├── Initial_translate.py
-│       │   └── TranslationDbService.py
+│       │   └── TranslationDbService.py   # get_next_start_pk, fetch, save
 │       └── prompts/
 │           └── prompts.py
-├── config.py                     # OS별 기본 경로 (PDF, DB)
+├── config.py                     # OS별 기본 PDF 경로 (DEFAULT_PDF_PATH)
 ├── requirements.txt
 └── README.md
 ```
@@ -126,7 +123,7 @@ translater_ai_project/
 | **PDF** | PyMuPDF (`fitz`) |
 | **문장 분리** | SoMaJo (독일어 `de_CMC`) |
 | **전처리 LLM** | LangChain + Google Gemini 2.5 Flash |
-| **번역 LLM** | LangChain + Anthropic Claude Sonnet |
+| **번역 LLM** | LangChain + Anthropic Claude Sonnet 4.5 |
 | **저장소** | SQLite (`philosophy_translation.db`) |
 
 ---
@@ -178,7 +175,9 @@ initial_state = {
 final_output = app.invoke(initial_state)
 ```
 
-**경로 설정**: `config.py`에서 `DEFAULT_PDF_PATH` 수정. Windows: `D:\Pdf\test.pdf`, macOS: `/Users/leejaebin/Desktop/test.pdf` (기본값).
+전처리 실행 시 `flatten_sentences_top100.txt`에 `german_sentences` 샘플(인덱스 100~199, 100개)이 저장됨.
+
+**경로 설정**: `config.py`에서 `DEFAULT_PDF_PATH` 수정. Windows: `D:\Pdf\test.pdf`, macOS: `/Users/leejaebin/Desktop/test.pdf`.
 
 ---
 
@@ -188,17 +187,27 @@ final_output = app.invoke(initial_state)
 python -m main.post_process.graph
 ```
 
+스크립트 실행 시 `get_next_start_pk`로 미번역 문장의 시작 `id`를 조회한 뒤, 해당 시점부터 5000토큰 단위로 배치 번역을 수행함. 미번역 문장이 없으면 종료함.
+
 ```python
 from main.post_process.graph import create_translation_workflow
+from main.post_process.service.TranslationDbService import get_next_start_pk
+import config
 
 app = create_translation_workflow()
-initial_state = {
-    "db_path": "philosophy_translation.db",
-    "author": "Dilthey, Wilhelm",
-    "book_title": "...",
-    "current_pk": 1,
-}
-app.invoke(initial_state)
+db_path = getattr(config, "DEFAULT_DB_PATH", "philosophy_translation.db")
+author = "Dilthey, Wilhelm"
+book_title = "Dilthey, Wilhelm: Einleitung in die Geisteswissenschaften. ..."
+start_pk = get_next_start_pk(db_path, author, book_title)
+
+if start_pk > 0:
+    initial_state = {
+        "db_path": db_path,
+        "author": "Dilthey, Wilhelm",
+        "book_title": "...",
+        "current_pk": start_pk,
+    }
+    app.invoke(initial_state)
 ```
 
 ---
@@ -209,7 +218,7 @@ app.invoke(initial_state)
 python -m main.read_db_sentences
 ```
 
-`main/pre_process/service/Utils.py`의 `read_from_db(db_path)`로 `german_sentence` 목록 조회. 결과는 `db_sentences.txt`에 저장됨.
+`processed_sentences` 테이블의 `id` 1~100 행을 조회하여 전체 컬럼을 콘솔에 출력함.
 
 ---
 

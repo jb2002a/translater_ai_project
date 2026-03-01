@@ -13,6 +13,29 @@ def _estimate_tokens(text: str, chars_per_token: int = DEFAULT_CHARS_PER_TOKEN) 
     return max(1, len(text) // chars_per_token)
 
 
+def get_next_start_pk(db_path: str, author: str, book_title: str) -> int:
+    """
+    미번역(korean_sentence IS NULL) 문장 중 가장 작은 id를 반환.
+    모두 번역되었으면 0을 반환.
+    """
+    try:
+        with sqlite3.connect(db_path) as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT MIN(id) FROM processed_sentences
+                WHERE author = ? AND book_title = ?
+                AND (korean_sentence IS NULL OR korean_sentence = '')
+                """,
+                (author, book_title),
+            )
+            row = cur.fetchone()
+            val = row[0] if row else None
+            return int(val) if val is not None else 0
+    except sqlite3.Error as e:
+        raise DatabaseError(f"DB 조회 실패: {db_path}", cause=e) from e
+
+
 def fetch_german_sentences_within_tokens(
     state: Any,
     max_tokens: int = 5000,
