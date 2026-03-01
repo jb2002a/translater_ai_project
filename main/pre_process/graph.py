@@ -1,13 +1,16 @@
+"""
+전처리 그래프: PDF 추출 → 청킹 → cleanup → flatten → DB 저장
+"""
 from pathlib import Path
 import sys
 
-# main/main.py 직접 실행 시 프로젝트 루트에서 config 로드
-_root = Path(__file__).resolve().parent.parent
+_root = Path(__file__).resolve().parent.parent.parent
 if str(_root) not in sys.path:
     sys.path.insert(0, str(_root))
-import config
 
 from langgraph.graph import StateGraph, END
+
+from main.TranslationState import GraphState
 from main.pre_process.node.ExtractNode import extract_node
 from main.pre_process.node.PreProcessingNode import (
     cleanup_node,
@@ -16,11 +19,10 @@ from main.pre_process.node.PreProcessingNode import (
     re_chunking_node,
     save_db_node,
 )
-from main.TranslationState import GraphState
-from main.pre_process.service.Utils import generate_text_file_du
 
 
-def create_workflow():
+def create_preprocessing_workflow():
+    """전처리 전용 워크플로우 생성."""
     workflow = StateGraph(GraphState)
 
     workflow.add_node("extract", extract_node)
@@ -41,11 +43,12 @@ def create_workflow():
     return workflow.compile()
 
 
-# Example Usage:
 if __name__ == "__main__":
-    app = create_workflow()
+    import config
 
-    initial_state = {
+    app = create_preprocessing_workflow()
+
+    initial_state: GraphState = {
         "pdf_path": config.DEFAULT_PDF_PATH,
         "author": "Dilthey, Wilhelm",
         "book_title": "Dilthey, Wilhelm: Einleitung in die Geisteswissenschaften. Versuch einer Grundlegung für das Studium der Gesellschaft und der Geschichte. Bd. 1. Leipzig, 1883",
@@ -57,10 +60,8 @@ if __name__ == "__main__":
 
     # flatten_sentences 결과 청크(german_sentences) 상위 100개 idx : value 형식으로 텍스트 파일 저장
     chunks = final_output.get("german_sentences", [])
-    out_path = Path(__file__).resolve().parent.parent / "flatten_sentences_top100.txt"
+    out_path = Path(__file__).resolve().parent.parent.parent / "flatten_sentences_top100.txt"
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(f"# flatten_sentences 결과 청크 수: {len(chunks)}, 상위 100개\n\n")
         for idx, value in enumerate(chunks[100:200]):
             f.write(f"{idx} : {value}\n")
-
-

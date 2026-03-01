@@ -31,11 +31,11 @@
 ```
 translater_ai_project/
 ├── main/
-│   ├── main.py                 # LangGraph 워크플로우 정의 (extract → chunking → cleanup → save_db)
-│   ├── TranslationState.py     # GraphState (pdf_path, author, book_title, raw_text, raw_chunks, german_sentences 등)
+│   ├── TranslationState.py     # GraphState(전처리), PostTranslationState(후처리)
 │   ├── models/
 │   │   └── models.py           # LLM 래퍼 (Google Gemini: 전처리, Anthropic Claude: 번역)
 │   ├── pre_process/
+│   │   ├── graph.py            # 전처리 그래프 (create_preprocessing_workflow)
 │   │   ├── node/
 │   │   │   ├── ExtractNode.py      # PDF → raw_text
 │   │   │   └── PreProcessingNode.py # chunking_node, cleanup_node, save_db_node
@@ -47,6 +47,7 @@ translater_ai_project/
 │   │   └── prompts/
 │   │       └── prompts.py      # 독일어 OCR 복원/정리 프롬프트
 │   └── post_process/
+│       ├── graph.py            # 후처리 그래프 (create_translation_workflow)
 │       ├── Initial_translate.py # 문장별 한국어 번역 (Claude)
 │       ├── prompts.py          # 번역용 시스템 프롬프트
 │       └── ToolsForList.py     # 리스트/문장 처리 유틸
@@ -98,23 +99,34 @@ pip install -r requirements.txt
 
 ### 전처리 파이프라인만 실행 (PDF → DB)
 
-`main/main.py`에서 워크플로우를 만들고, `pdf_path`, `author`, `book_title`을 넣어 실행합니다.
+전처리 전용 그래프: `main/pre_process/graph.py`
+
+**실행**: `python -m main.pre_process.graph`
 
 **경로 설정**: Windows의 D: 드라이브(보조장치 x31)는 Mac에서 `/Volumes/x31/`로 마운트됩니다. 기본 PDF 경로는 `config.py`에서 OS별로 설정됩니다 (Windows: `D:\Pdf\test.pdf`, macOS: `/Volumes/x31/Pdf/test.pdf`). 다른 경로는 `config.DEFAULT_PDF_PATH`를 수정하거나 실행 시 `pdf_path`를 넘기면 됩니다.
 
 ```python
 import config
-from main.main import create_workflow
+from main.pre_process.graph import create_preprocessing_workflow
 
-app = create_workflow()
+app = create_preprocessing_workflow()
 initial_state = {
     "pdf_path": config.DEFAULT_PDF_PATH,
     "author": "Dilthey, Wilhelm",
     "book_title": "Dilthey, Wilhelm: Einleitung in die Geisteswissenschaften. ...",
+    "db_path": "philosophy_translation.db",
 }
 final_output = app.invoke(initial_state)
-print(final_output.get("db_status"))  # "saved"
+print(final_output.get("german_sentences", [])[:5])
 ```
+
+### 후처리(번역) 파이프라인 실행 (DB → 번역 저장)
+
+```bash
+python -m main.post_process.graph
+```
+
+또는 `from main.post_process.graph import create_translation_workflow`
 
 ### extract + chunking만 테스트
 
