@@ -1,4 +1,6 @@
 SoMaJo>=2.0.0
+pymupdf
+python-dotenv
 langsmith
 langchain
 langchain-core

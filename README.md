@@ -2,27 +2,82 @@
 
 독일어 철학·학술 문헌을 PDF에서 추출하고, 전처리한 뒤 문장 단위로 DB에 저장하며, 필요 시 한국어로 번역하는 **LangGraph 기반 파이프라인** 프로젝트입니다.
 
+고전 독일어 철학 텍스트의 OCR 품질 개선과 학술 번역에 최적화되어 있습니다.
+
 ---
 
 ## 개요
 
-- **입력**: PDF 파일 경로, 저자명, 책/문헌 제목
-- **처리**: PDF 텍스트 추출 → 문장 단위 청킹(PySBD) → 청크별 LLM 전처리(탈하이픈, 정서법, 노이즈 제거) → SQLite DB 저장
-- **선택**: 저장된 문장을 DB에서 읽어 독일어→한국어 학술 번역(Anthropic Claude)
-
-고전 독일어 철학 텍스트의 OCR 품질 개선과 번역 준비에 최적화되어 있습니다.
+| 구분 | 내용 |
+|------|------|
+| **입력** | PDF 파일 경로, 저자명, 책/문헌 제목 |
+| **전처리** | PDF 추출 → SoMaJo 문장 분리 → 배치 묶기 → LLM 정제(탈하이픈, 정서법, 노이즈 제거) → 문장 평탄화 → DB 저장 |
+| **후처리(번역)** | DB에서 미번역 문장 조회 → Claude 번역 → DB 업데이트 (반복 루프) |
 
 ---
 
-## 주요 기능
+## 전체 플로우
 
-| 단계 | 설명 |
-|------|------|
-| **Extract** | PyMuPDF(fitz)로 PDF에서 텍스트 추출 |
-| **Chunking** | PySBD로 독일어 문장 경계 분리(청크 리스트 생성) |
-| **Cleanup** | 청크별 병렬 LLM 전처리(탈하이픈, 정서법, 메타데이터·노이즈 제거) |
-| **Save DB** | `processed_sentences` 테이블에 문장 단위 저장 |
-| **Translation** | DB/텍스트 기반으로 Claude를 이용한 한국어 번역( post_process ) |
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  전처리 (pre_process)                                                           │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│   [extract] → [chunking] → [re_chunking] → [cleanup] → [flatten_sentences]     │
+│       │            │              │              │                │              │
+│       ▼            ▼              ▼              ▼                ▼              │
+│   raw_text    raw_chunks    batched_chunks  cleaned_batches  german_sentences   │
+│   (PyMuPDF)   (SoMaJo)     (1.5만 토큰/배치)  (Gemini 병렬)   (SoMaJo 재분리)     │
+│       │                                                              │          │
+│       └──────────────────────────────────────────────────────────────┼──────────┘
+│                                                                      ▼          │
+│                                                              [save_db] → END    │
+│                                                                  │              │
+└──────────────────────────────────────────────────────────────────┼──────────────┘
+                                                                   │
+                                                                   ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  후처리 (post_process)                                                           │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│   ┌──────────────┐     pending 있음      ┌────────────┐     ┌─────────────────┐ │
+│   │fetch_sentences│ ──────────────────→ │  translate  │ ──→ │save_translations │ │
+│   └──────┬───────┘                      └──────┬──────┘     └────────┬──────────┘ │
+│          │                                     │                     │           │
+│          │ pending 없음                        │                     │           │
+│          ▼                                     │                     │           │
+│       [END]  ←─────────────────────────────────┴─────────────────────┘           │
+│          │         (루프: fetch → translate → save → fetch)                      │
+│          │                                                                      │
+│   - 5000토큰 단위로 DB 조회                                                     │
+│   - Claude로 문장별 번역                                                        │
+│   - korean_sentence 컬럼 업데이트                                               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 주요 노드 설명
+
+### 전처리 (Pre-processing)
+
+| 노드 | 설명 | 입력 → 출력 |
+|------|------|-------------|
+| **extract** | PyMuPDF로 PDF에서 텍스트 추출 | `pdf_path` → `raw_text` |
+| **chunking** | SoMaJo로 독일어 문장 경계 분리 | `raw_text` → `raw_chunks` |
+| **re_chunking** | LLM 호출용 1.5만 토큰 단위 배치 묶기 | `raw_chunks` → `batched_chunks` |
+| **cleanup** | 청크별 병렬 Gemini 전처리 (탈하이픈, 정서법, 노이즈 제거) | `batched_chunks` → `cleaned_batches` |
+| **flatten_sentences** | 정제된 배치를 SoMaJo로 재분리 후 문장 리스트 생성 | `cleaned_batches` → `german_sentences` |
+| **save_db** | SQLite `processed_sentences` 테이블에 저장 | `german_sentences` → DB |
+
+### 후처리 (Translation)
+
+| 노드 | 설명 | 입력 → 출력 |
+|------|------|-------------|
+| **fetch_sentences** | `current_pk`부터 5000토큰 이내 미번역 문장 조회 | state → `pending_items`, `current_pk` |
+| **translate** | Claude로 문장별 독일어→한국어 학술 번역 | `pending_items` → `translated_items` |
+| **save_translations** | `korean_sentence` 컬럼 업데이트 후 `fetch_sentences`로 재진입 | `translated_items` → DB |
 
 ---
 
@@ -31,27 +86,32 @@
 ```
 translater_ai_project/
 ├── main/
-│   ├── TranslationState.py     # GraphState(전처리), PostTranslationState(후처리)
+│   ├── TranslationState.py       # GraphState, PostTranslationState
+│   ├── exceptions.py             # 예외 클래스
 │   ├── models/
-│   │   └── models.py           # LLM 래퍼 (Google Gemini: 전처리, Anthropic Claude: 번역)
+│   │   └── models.py             # Gemini(전처리), Claude(번역) LLM 래퍼
 │   ├── pre_process/
-│   │   ├── graph.py            # 전처리 그래프 (create_preprocessing_workflow)
+│   │   ├── graph.py              # 전처리 그래프 (create_preprocessing_workflow)
 │   │   ├── node/
-│   │   │   ├── ExtractNode.py      # PDF → raw_text
-│   │   │   └── PreProcessingNode.py # chunking_node, cleanup_node, save_db_node
+│   │   │   ├── ExtractNode.py
+│   │   │   └── PreProcessingNode.py
 │   │   ├── service/
-│   │   │   ├── ExtractService.py   # PDF 텍스트 추출 (PyMuPDF)
-│   │   │   ├── SegmentService.py   # SoMaJo 문장 분리 (독일어)
-│   │   │   ├── PreProcessingService.py # 청크별 LLM 전처리, DB 저장
-│   │   │   └── Utils.py            # DB 읽기, 텍스트 파일 출력
+│   │   │   ├── ExtractService.py
+│   │   │   ├── SegmentService.py      # SoMaJo 문장 분리
+│   │   │   ├── PreProcessingService.py
+│   │   │   └── Utils.py
 │   │   └── prompts/
-│   │       └── prompts.py      # 독일어 OCR 복원/정리 프롬프트
+│   │       └── prompts.py
 │   └── post_process/
-│       ├── graph.py            # 후처리 그래프 (create_translation_workflow)
-│       ├── Initial_translate.py # 문장별 한국어 번역 (Claude)
-│       ├── prompts.py          # 번역용 시스템 프롬프트
-│       └── ToolsForList.py     # 리스트/문장 처리 유틸
-├── test.py                     # extract + chunking 워크플로우 테스트
+│       ├── graph.py              # 번역 그래프 (create_translation_workflow)
+│       ├── node/
+│       │   └── TranslateNode.py
+│       ├── service/
+│       │   ├── Initial_translate.py
+│       │   └── TranslationDbService.py
+│       └── prompts/
+│           └── prompts.py
+├── config.py                     # OS별 기본 경로 (PDF, DB)
 ├── requirements.txt
 └── README.md
 ```
@@ -60,11 +120,14 @@ translater_ai_project/
 
 ## 기술 스택
 
-- **오케스트레이션**: LangGraph (StateGraph)
-- **PDF**: PyMuPDF (`fitz`)
-- **문장 분리**: SoMaJo (독일어)
-- **LLM**: LangChain (Google Gemini 2.5 Flash – 전처리, Anthropic Claude – 번역)
-- **저장소**: SQLite (`philosophy_translation.db`)
+| 분류 | 기술 |
+|------|------|
+| **오케스트레이션** | LangGraph (StateGraph) |
+| **PDF** | PyMuPDF (`fitz`) |
+| **문장 분리** | SoMaJo (독일어 `de_CMC`) |
+| **전처리 LLM** | LangChain + Google Gemini 2.5 Flash |
+| **번역 LLM** | LangChain + Anthropic Claude Sonnet |
+| **저장소** | SQLite (`philosophy_translation.db`) |
 
 ---
 
@@ -76,34 +139,30 @@ translater_ai_project/
 pip install -r requirements.txt
 ```
 
-코드에서 사용하는 패키지 예시(필요 시 추가 설치):
-
-- `langgraph`
-- `langchain-google-genai`, `langchain-anthropic`, `langchain-core`
-- `pymupdf` (fitz)
-- `SoMaJo`
-- `python-dotenv`
+주요 패키지: `langgraph`, `langchain-google-genai`, `langchain-anthropic`, `pymupdf`, `SoMaJo`, `python-dotenv`, `langsmith`
 
 ### 2. 환경 변수 (.env)
 
-프로젝트 루트에 `.env` 파일을 두고 다음 키를 설정합니다.
+프로젝트 루트에 `.env` 파일 생성:
 
 | 변수명 | 용도 |
 |--------|------|
 | `GOOGLE_API_KEY` | 전처리용 Gemini API |
 | `ANTHROPIC_API_KEY` | 번역용 Claude API |
+| `LANGCHAIN_TRACING_V2` | `true` 시 LangSmith 트레이싱 활성화 (선택) |
+| `LANGSMITH_API_KEY` | LangSmith API 키 (선택) |
 
 ---
 
 ## 사용 방법
 
-### 전처리 파이프라인만 실행 (PDF → DB)
+### 전처리만 실행 (PDF → DB)
 
-전처리 전용 그래프: `main/pre_process/graph.py`
+```bash
+python -m main.pre_process.graph
+```
 
-**실행**: `python -m main.pre_process.graph`
-
-**경로 설정**: Windows의 D: 드라이브(보조장치 x31)는 Mac에서 `/Volumes/x31/`로 마운트됩니다. 기본 PDF 경로는 `config.py`에서 OS별로 설정됩니다 (Windows: `D:\Pdf\test.pdf`, macOS: `/Volumes/x31/Pdf/test.pdf`). 다른 경로는 `config.DEFAULT_PDF_PATH`를 수정하거나 실행 시 `pdf_path`를 넘기면 됩니다.
+또는 코드에서:
 
 ```python
 import config
@@ -117,54 +176,60 @@ initial_state = {
     "db_path": "philosophy_translation.db",
 }
 final_output = app.invoke(initial_state)
-print(final_output.get("german_sentences", [])[:5])
 ```
 
-### 후처리(번역) 파이프라인 실행 (DB → 번역 저장)
+**경로 설정**: `config.py`에서 `DEFAULT_PDF_PATH` 수정. Windows: `D:\Pdf\test.pdf`, macOS: `/Users/leejaebin/Desktop/test.pdf` (기본값).
+
+---
+
+### 번역 실행 (DB → 한국어 저장)
 
 ```bash
 python -m main.post_process.graph
 ```
 
-또는 `from main.post_process.graph import create_translation_workflow`
+```python
+from main.post_process.graph import create_translation_workflow
 
-### extract + chunking만 테스트
-
-```bash
-python test.py
+app = create_translation_workflow()
+initial_state = {
+    "db_path": "philosophy_translation.db",
+    "author": "Dilthey, Wilhelm",
+    "book_title": "...",
+    "current_pk": 1,
+}
+app.invoke(initial_state)
 ```
 
-`test.py`는 PDF 추출 후 PySBD 청킹까지만 수행해 문장 분리 결과를 확인합니다.
+---
 
-### DB에서 문장 읽기
+### DB 문장 조회
 
-`main/pre_process/service/Utils.py`의 `read_from_db(db_path)`로 `processed_sentences`의 `german_sentence` 목록을 가져올 수 있습니다. 이 데이터를 `post_process/Initial_translate.py`의 `initial_translate(text, author, book_title)` 등과 연동해 번역할 수 있습니다.
+```bash
+python -m main.read_db_sentences
+```
+
+`main/pre_process/service/Utils.py`의 `read_from_db(db_path)`로 `german_sentence` 목록 조회. 결과는 `db_sentences.txt`에 저장됨.
 
 ---
 
 ## 데이터베이스
 
-- **파일**: `philosophy_translation.db` (프로젝트 루트 기준)
+- **파일**: `philosophy_translation.db` (프로젝트 루트)
 - **테이블**: `processed_sentences`
-  - `id`, `pdf_path`, `author`, `book_title`, `german_sentence`, `status` (기본값 `'pending'`)
 
----
-
-## 워크플로우 요약
-
-```
-[extract] → [chunking] → [cleanup] → [save_db] → END
-```
-
-1. **extract**: `pdf_path`로 PDF 열어 `raw_text` 생성  
-2. **chunking**: `raw_text`를 PySBD로 문장 단위 `raw_chunks` 리스트로 분리  
-3. **cleanup**: `raw_chunks`를 청크별로 병렬 LLM 전처리 후 `sentences` 리스트로 정리  
-4. **save_db**: `pdf_path`, `author`, `book_title`, `sentences`를 DB에 저장  
-
-전처리 프롬프트는 독일어 OCR 복원(탈하이픈, 정서법, 메타데이터·노이즈 제거, 한 줄 연속 텍스트 출력)에 맞춰져 있습니다.
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | INTEGER | PK, 자동 증가 |
+| `pdf_path` | TEXT | 원본 PDF 경로 |
+| `author` | TEXT | 저자명 |
+| `book_title` | TEXT | 문헌 제목 |
+| `german_sentence` | TEXT | 전처리된 독일어 문장 |
+| `korean_sentence` | TEXT | 번역된 한국어 (후처리 시 업데이트) |
+| `status` | TEXT | 기본값 `'pending'` |
 
 ---
 
 ## 라이선스 및 기여
 
-저장소 설정에 따라 라이선스가 정해집니다. 기여는 이슈/PR로 제안할 수 있습니다.
+저장소 설정에 따라 라이선스가 정해집니다. 이슈/PR로 기여를 제안할 수 있습니다.
