@@ -116,7 +116,6 @@ def save_to_db(pdf_path, author, book_title, sentences, db_path):
     try:
         conn = sqlite3.connect(db_path)
         cur = conn.cursor()
-        # status는 pending, translated, approved 중 하나 / 대기, 번역 완료, 유저 승인전
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS processed_sentences (

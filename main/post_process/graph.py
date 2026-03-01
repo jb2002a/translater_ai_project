@@ -11,6 +11,7 @@ if str(_root) not in sys.path:
 from langgraph.graph import StateGraph, END
 
 from main.TranslationState import PostTranslationState
+from main.post_process.service.TranslationDbService import get_next_start_pk
 from main.post_process.node.TranslateNode import (
     fetch_sentences_node,
     translate_node,
@@ -49,11 +50,20 @@ if __name__ == "__main__":
 
     app = create_translation_workflow()
 
+    db_path = getattr(config, "DEFAULT_DB_PATH", "philosophy_translation.db")
+    author = "Dilthey, Wilhelm"
+    book_title = "Dilthey, Wilhelm: Einleitung in die Geisteswissenschaften. Versuch einer Grundlegung für das Studium der Gesellschaft und der Geschichte. Bd. 1. Leipzig, 1883"
+
+    start_pk = get_next_start_pk(db_path, author, book_title)
+    if start_pk == 0:
+        print("미번역 문장이 없습니다.")
+        raise SystemExit(0)
+
     initial_state: PostTranslationState = {
-        "db_path": getattr(config, "DEFAULT_DB_PATH", "philosophy_translation.db"),
-        "author": "Dilthey, Wilhelm",
-        "book_title": "Dilthey, Wilhelm: Einleitung in die Geisteswissenschaften. Versuch einer Grundlegung für das Studium der Gesellschaft und der Geschichte. Bd. 1. Leipzig, 1883",
-        "current_pk": 1,
+        "db_path": db_path,
+        "author": author,
+        "book_title": book_title,
+        "current_pk": start_pk,
     }
 
     final_output = app.invoke(initial_state)
