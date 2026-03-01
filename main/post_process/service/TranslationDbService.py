@@ -63,17 +63,6 @@ def fetch_german_sentences_within_tokens(
     return items, {"current_pk": next_pk}
 
 
-def _ensure_korean_sentence_column(conn: sqlite3.Connection) -> None:
-    """processed_sentences 테이블에 korean_sentence 컬럼이 없으면 추가한다."""
-    cur = conn.cursor()
-    cur.execute("PRAGMA table_info(processed_sentences)")
-    columns = [row[1] for row in cur.fetchall()]
-    if "korean_sentence" not in columns:
-        cur.execute(
-            "ALTER TABLE processed_sentences ADD COLUMN korean_sentence TEXT"
-        )
-
-
 def save_translations_to_db(
     db_path: str,
     translations: List[Tuple[int, str]],
@@ -88,7 +77,6 @@ def save_translations_to_db(
     try:
         with sqlite3.connect(db_path) as conn:
             cur = conn.cursor()
-            _ensure_korean_sentence_column(conn)
             cur.executemany(
                 """
                 UPDATE processed_sentences
