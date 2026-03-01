@@ -1,5 +1,5 @@
 """
-후처리(번역) 그래프: DB에서 미번역 문장 조회 → LLM 번역 → DB 저장 (반복)
+후처리(번역) 그래프: DB에서 미번역 문장 조회 → LLM 번역 → DB 저장
 """
 from pathlib import Path
 import sys
@@ -19,13 +19,6 @@ from main.post_process.node.TranslateNode import (
 )
 
 
-def _route_after_fetch(state: PostTranslationState) -> str:
-    """fetch_sentences 후: pending_items가 있으면 translate, 없으면 종료"""
-    if state.get("pending_items"):
-        return "translate"
-    return "__end__"
-
-
 def create_translation_workflow():
     workflow = StateGraph(PostTranslationState)
 
@@ -34,13 +27,9 @@ def create_translation_workflow():
     workflow.add_node("save_translations", save_translations_node)
 
     workflow.set_entry_point("fetch_sentences")
-    workflow.add_conditional_edges(
-        "fetch_sentences",
-        _route_after_fetch,
-        {"translate": "translate", "__end__": END},
-    )
+    workflow.add_edge("fetch_sentences", "translate")
     workflow.add_edge("translate", "save_translations")
-    workflow.add_edge("save_translations", "fetch_sentences")
+    workflow.add_edge("save_translations", END)
 
     return workflow.compile()
 
