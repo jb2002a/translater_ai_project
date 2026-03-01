@@ -27,7 +27,7 @@ def fetch_german_sentences_within_tokens(
         state_updates에 current_pk가 포함되며, 호출측에서 반영한다.
     """
     db_path = state.get("db_path")
-    current_pk = state.get("current_pk")
+    current_pk = state.get("current_pk", 1)
     try:
         with sqlite3.connect(db_path) as conn:
             cur = conn.cursor()

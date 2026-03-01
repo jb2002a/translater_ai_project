@@ -1,7 +1,8 @@
-from typing import TypedDict, List
+from typing import List, Tuple, TypedDict
 
 
 class GraphState(TypedDict, total=False):
+    """전처리(Pre-processing) 그래프 전용 state."""
     pdf_path: str
     db_path: str
     author: str
@@ -11,5 +12,14 @@ class GraphState(TypedDict, total=False):
     batched_chunks: List[str]
     cleaned_batches: List[str]
     german_sentences: List[str]
-    translated_items: List[tuple[int, str]]
-    current_pk: int = 1
+
+
+class PostTranslationState(TypedDict, total=False):
+    """후처리(번역) 그래프 전용 state."""
+    db_path: str
+    author: str
+    book_title: str
+    current_pk: int
+    pending_items: List[Tuple[int, str]]
+    translated_items: List[Tuple[int, str]]
+    last_saved_count: int
