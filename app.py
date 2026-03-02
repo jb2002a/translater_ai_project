@@ -14,13 +14,16 @@ from app_utils import (
     fetch_books,
     fetch_sentences,
     get_db_connection,
+    get_offset_by_id,
 )
 
 
 def _sentence_card(container: ui.column, row_id: int, german: str, korean: str, seq: int) -> None:
-    """문장 카드 하나를 container에 추가"""
+    """문장 카드 하나를 container에 추가 (id=sentence-{row_id}로 스크롤 이동 가능)"""
     with container:
-        with ui.card().classes("w-full p-4 my-2 bg-slate-50 border border-slate-200 rounded-lg"):
+        with ui.card().classes("w-full p-4 my-2 bg-slate-50 border border-slate-200 rounded-lg").props(
+            f"id=sentence-{row_id}"
+        ):
             ui.label(f"문장 {seq} · ID: {row_id}").classes("text-xs text-slate-400")
             ui.label("독일어").classes("text-xs text-slate-500")
             ui.label(german or "").classes("text-base leading-relaxed whitespace-pre-wrap")
@@ -96,7 +99,36 @@ def mapping(request: Request):
     total = count_sentences(conn, author, book_title)
     conn.close()
 
-    ui.label(f"총 {total}개 문장").classes("text-slate-500 text-sm mb-4")
+    ui.label(f"총 {total}개 문장").classes("text-slate-500 text-sm mb-2")
+
+    # ID 검색 후 해당 위치로 스크롤
+    with ui.row().classes("items-center gap-2 mb-4"):
+        id_input = ui.input("ID", placeholder="문장 ID 입력").classes("w-36").props("type=number outlined dense")
+
+        def go_to_id():
+            try:
+                sid = int((id_input.value or "").strip() or "0")
+            except ValueError:
+                ui.notify("올바른 ID를 입력하세요.", type="warning")
+                return
+            if sid <= 0:
+                ui.notify("올바른 ID를 입력하세요.", type="warning")
+                return
+            conn = get_db_connection()
+            target = get_offset_by_id(conn, author, book_title, sid)
+            conn.close()
+            if target is None:
+                ui.notify("이 책에 해당 ID가 없습니다.", type="warning")
+                return
+            while offset["value"] <= target and has_more["value"]:
+                load_more()
+            ui.run_javascript(
+                f"var el = document.getElementById('sentence-{sid}'); "
+                "if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });"
+            )
+
+        ui.button("이동", on_click=go_to_id).props("unelevated")
+
     ui.separator()
 
     # 카드만 담는 컨테이너 (무한 스크롤 시 여기에 추가)
@@ -146,6 +178,14 @@ def mapping(request: Request):
     })();
     """
     ui.run_javascript(observer_js)
+
+    # 오른쪽 하단 Top 버튼
+    def scroll_to_top():
+        ui.run_javascript("window.scrollTo({ top: 0, behavior: 'smooth' });")
+
+    ui.button("Top", on_click=scroll_to_top).props("round unelevated").classes(
+        "fixed bottom-6 right-6 z-10 shadow-lg"
+    ).style("position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 1000;")
 
 
 def main():

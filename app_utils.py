@@ -53,3 +53,28 @@ def count_sentences(conn: sqlite3.Connection, author: str, book_title: str) -> i
         (author, book_title),
     )
     return cur.fetchone()[0]
+
+
+def get_offset_by_id(
+    conn: sqlite3.Connection, author: str, book_title: str, sentence_id: int
+) -> int | None:
+    """해당 책에서 sentence_id의 0-based 순서(offset). 없으면 None."""
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT COUNT(*) FROM processed_sentences
+        WHERE author = ? AND book_title = ? AND id < ?
+        """,
+        (author, book_title, sentence_id),
+    )
+    count = cur.fetchone()[0]
+    cur.execute(
+        """
+        SELECT 1 FROM processed_sentences
+        WHERE author = ? AND book_title = ? AND id = ?
+        """,
+        (author, book_title, sentence_id),
+    )
+    if cur.fetchone() is None:
+        return None
+    return count
