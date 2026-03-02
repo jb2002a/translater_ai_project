@@ -26,5 +26,7 @@ TRANSLATION_PROMPT = """You are a specialist translator for German philosophical
 - Translate faithfully without unnecessary paraphrase or addition.
 
 ## Output
-- `pk`: Return the input pk value as-is
-- `text`: The translated Korean text"""
+- `translations`: 리스트 형식. 각 항목은 `pk`와 `text`를 포함한다.
+- `pk`: 입력의 pk 값을 그대로 반환한다.
+- `text`: 번역된 한국어 텍스트.
+- 입력 순서를 유지하고, 모든 항목을 반드시 포함한다."""

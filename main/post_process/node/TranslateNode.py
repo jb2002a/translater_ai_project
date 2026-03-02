@@ -1,5 +1,5 @@
 from typing import List, Tuple
-from ..service.Initial_translate import initial_translate
+from ..service.Initial_translate import initial_translate_batch
 from ..service.TranslationDbService import (
     fetch_german_sentences_within_tokens,
     save_translations_to_db,
@@ -35,14 +35,10 @@ def translate_node(state: PostTranslationState) -> dict:
         author = _require(state, "author")
         book_title = _require(state, "book_title")
 
-        translated_items: List[Tuple[int, str]] = []
-        # (pk, sentence) 튜플로 이루어진 리스트를 순회하여 각 문장 번역
-        for pk, sentence in pending_items:
-            result = initial_translate(
-                pk=pk, text=sentence, author=author, book_title=book_title
-            )
-            translated_items.append((result.pk, result.text))
-
+        # (pk, sentence) 튜플로 이루어진 리스트를 한 번에 번역
+        translated_items = initial_translate_batch(
+            items=pending_items, author=author, book_title=book_title
+        )
         return {"translated_items": translated_items}
     except TranslaterAIError:
         raise
