@@ -11,6 +11,7 @@ if str(_root) not in sys.path:
 from langgraph.graph import StateGraph, END
 
 from main.TranslationState import PostTranslationState
+from main.exceptions import TranslaterAIError
 from main.post_process.service.TranslationDbService import has_untranslated_sentences
 from main.post_process.node.TranslateNode import (
     fetch_sentences_node,
@@ -61,5 +62,9 @@ if __name__ == "__main__":
         "book_title": book_title,
     }
 
-    final_output = app.invoke(initial_state)
-    print(f"번역 완료. 마지막 배치 저장 수: {final_output.get('last_saved_count', 'N/A')}")
+    try:
+        final_output = app.invoke(initial_state)
+        print(f"번역 완료. 마지막 배치 저장 수: {final_output.get('last_saved_count', 'N/A')}")
+    except TranslaterAIError as e:
+        print(f"번역 실패: {e}", file=sys.stderr)
+        raise SystemExit(1)

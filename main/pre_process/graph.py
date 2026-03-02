@@ -11,6 +11,7 @@ if str(_root) not in sys.path:
 from langgraph.graph import StateGraph, END
 
 from main.TranslationState import GraphState
+from main.exceptions import TranslaterAIError
 from main.pre_process.node.ExtractNode import extract_node
 from main.pre_process.node.PreProcessingNode import (
     cleanup_node,
@@ -56,7 +57,11 @@ if __name__ == "__main__":
     }
 
     # Run the workflow (LangSmith: LANGCHAIN_TRACING_V2=true 시 자동 트레이싱)
-    final_output = app.invoke(initial_state)
+    try:
+        final_output = app.invoke(initial_state)
+    except TranslaterAIError as e:
+        print(f"전처리 실패: {e}", file=sys.stderr)
+        raise SystemExit(1)
 
     # flatten_sentences 결과 청크(german_sentences) 상위 100개 idx : value 형식으로 텍스트 파일 저장
     chunks = final_output.get("german_sentences", [])
