@@ -41,7 +41,7 @@ def fetch_german_sentences_within_tokens(
     db_path: str,
     author: str,
     book_title: str,
-    max_tokens: int = 5000,
+    max_tokens: int = 10000,
     chars_per_token: int = DEFAULT_CHARS_PER_TOKEN,
 ) -> List[Tuple[int, str]]:
     """
