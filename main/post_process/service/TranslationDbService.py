@@ -103,7 +103,7 @@ def save_translations_to_db(
             cur.executemany(
                 """
                 UPDATE processed_sentences
-                SET korean_sentence = ?
+                SET korean_sentence = ?, status = 'complete'
                 WHERE id = ?
                 """,
                 [(korean, pk) for pk, korean in translations],
