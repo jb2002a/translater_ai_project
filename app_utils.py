@@ -78,3 +78,28 @@ def get_offset_by_id(
     if cur.fetchone() is None:
         return None
     return count
+
+
+def check_duplicate_book(
+    conn: sqlite3.Connection, author: str, book_title: str
+) -> bool:
+    """동일 author + book_title 조합이 이미 DB에 있는지 확인."""
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT 1 FROM processed_sentences WHERE author = ? AND book_title = ? LIMIT 1",
+        (author, book_title),
+    )
+    return cur.fetchone() is not None
+
+
+def delete_book(
+    conn: sqlite3.Connection, author: str, book_title: str
+) -> int:
+    """해당 책의 모든 문장을 삭제하고 삭제된 행 수를 반환."""
+    cur = conn.cursor()
+    cur.execute(
+        "DELETE FROM processed_sentences WHERE author = ? AND book_title = ?",
+        (author, book_title),
+    )
+    conn.commit()
+    return cur.rowcount
