@@ -30,7 +30,7 @@ def fetch_sentences_node(state: PostTranslationState) -> dict:
 
 # pending_items의 독일어 청킹을 LLM에 번역 요청, translated_items에 저장
 def translate_node(state: PostTranslationState) -> dict:
-    pending_items: List[Tuple[int, str]] = _require(state, "pending_items")
+    pending_items: List[List[Tuple[int, str]]] = _require(state, "pending_items")
     author = _require(state, "author")
     book_title = _require(state, "book_title")
 
