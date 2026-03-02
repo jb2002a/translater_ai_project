@@ -1,5 +1,7 @@
 # This file handles the initial translation of pre-processed German text into Korean
 
+from concurrent.futures import ThreadPoolExecutor
+
 from typing import List, Tuple
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -8,6 +10,9 @@ from pydantic import BaseModel, Field
 from ...exceptions import LLMProviderError, TranslaterAIError
 from ...models import models
 from ..prompts.prompts import TRANSLATION_PROMPT
+
+# 병렬 번역 시 최대 동시 LLM 호출 수 (API rate limit 고려)
+_MAX_PARALLEL_WORKERS = 5
 
 
 class TranslationResult(BaseModel):
@@ -25,31 +30,47 @@ class BatchTranslationResult(BaseModel):
     )
 
 
+def _translate_single_chunk(
+    chunk: List[Tuple[int, str]], author: str, book_title: str
+) -> List[Tuple[int, str]]:
+    """단일 청크를 한 번의 LLM 호출로 번역."""
+    if not chunk:
+        return []
+    chat = models.get_chat_model_google_translation()
+    structured_chat = chat.with_structured_output(BatchTranslationResult)
+    system_prompt = TRANSLATION_PROMPT.format(AUTHOR=author, BOOK_TITLE=book_title)
+    parts = [f"---\npk: {pk}\n\n[텍스트]\n{text}" for pk, text in chunk]
+    human_message = "\n\n".join(parts)
+    messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=human_message),
+    ]
+    result = structured_chat.invoke(messages)
+    return [(t.pk, t.text) for t in result.translations]
+
+
 def initial_translate_batch(
-    items: List[Tuple[int, str]], author: str, book_title: str
+    items: List[List[Tuple[int, str]]], author: str, book_title: str
 ) -> List[Tuple[int, str]]:
     """
-    전처리된 독일어 문장 리스트를 한국어로 일괄 번역.
+    전처리된 독일어 문장 청크들을 병렬로 한국어 번역.
+    각 청크는 한 번의 LLM 호출로 번역된다.
     author, book_title은 시스템 프롬프트에 반영된다.
-    한 번의 LLM 호출로 전체 리스트를 번역한다.
     """
     if not items:
         return []
 
     try:
-        chat = models.get_chat_model_google_translation()
-        structured_chat = chat.with_structured_output(BatchTranslationResult)
-        system_prompt = TRANSLATION_PROMPT.format(AUTHOR=author, BOOK_TITLE=book_title)
-        parts = []
-        for pk, text in items:
-            parts.append(f"---\npk: {pk}\n\n[텍스트]\n{text}")
-        human_message = "\n\n".join(parts)
-        messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=human_message),
-        ]
-        result = structured_chat.invoke(messages)
-        return [(t.pk, t.text) for t in result.translations]
+        workers = min(_MAX_PARALLEL_WORKERS, len(items))
+        results: List[Tuple[int, str]] = []
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = [
+                executor.submit(_translate_single_chunk, chunk, author, book_title)
+                for chunk in items
+            ]
+            for future in futures:
+                results.extend(future.result())
+        return results
     except TranslaterAIError:
         raise
     except Exception as e:
