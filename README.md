@@ -104,14 +104,36 @@ translater_ai_project/
 │       ├── node/
 │       │   └── TranslateNode.py
 │       ├── service/
-│       │   ├── Initial_translate.py
+│       │   ├── Initial_translate.py      # 번역 LLM 호출 로직
 │       │   └── TranslationDbService.py   # has_untranslated_sentences, fetch, save
 │       └── prompts/
 │           └── prompts.py
+├── app.py                        # NiceGUI 기반 철학 번역 DB 뷰어 (웹 UI)
+├── app_utils.py                  # 뷰어용 DB 헬퍼 (DB_PATH, fetch_books 등)
+├── run.sh                        # 가상환경 기반 뷰어 실행 스크립트
 ├── config.py                     # OS별 기본 PDF 경로 (DEFAULT_PDF_PATH)
 ├── requirements.txt
 └── README.md
 ```
+
+---
+
+## 웹 뷰어 (NiceGUI 기반 UI)
+
+`app.py`는 `processed_sentences` DB를 시각적으로 탐색하고, 새로운 PDF를 업로드해서 **전처리 + 번역을 한 번에 수행**하는 웹 인터페이스를 제공합니다.
+
+- **메인 페이지 (`/`)**
+  - **책 선택 탭**: DB에 저장된 `(저자, 책 제목)` 목록을 불러와 선택하면, 해당 책의 문장 매핑 페이지(`/mapping`)로 이동합니다.
+  - **DB 관리 탭**
+    - PDF 업로드 + 저자/책 제목 입력 → 전처리 그래프(`create_preprocessing_workflow`)와 후처리 그래프(`create_translation_workflow`)를 순차 실행하여 DB에 저장 및 번역까지 진행합니다.
+    - 이미 동일한 `(저자, 책 제목)`이 있을 경우 중복 추가를 막습니다.
+    - 등록된 책 목록과 각 책의 문장 수를 보여주고, 선택한 책의 모든 문장을 DB에서 삭제할 수 있습니다.
+
+- **문장 매핑 페이지 (`/mapping`)**
+  - 선택한 책의 **독일어–한국어 문장 1:1 카드 뷰**를 무한 스크롤로 제공합니다.
+  - 상단 입력창에 **문장 번호**를 입력하면 해당 위치까지 자동으로 추가 로딩 후, 해당 카드로 스크롤 이동합니다.
+
+웹 뷰어는 내부적으로 `main.pre_process.graph`, `main.post_process.graph`, `TranslationDbService`, `Initial_translate` 등을 그대로 사용하므로, CLI에서의 플로우와 UI에서의 플로우가 일치합니다.
 
 ---
 
@@ -151,7 +173,7 @@ pip install -r requirements.txt
 
 ---
 
-## 사용 방법
+## 사용 방법 (CLI 파이프라인)
 
 ### 전처리만 실행 (PDF → DB)
 
@@ -217,6 +239,44 @@ python -m main.read_db_sentences
 ```
 
 `processed_sentences` 테이블의 `id` 1~100 행을 조회하여 전체 컬럼을 콘솔에 출력함.
+
+---
+
+## 사용 방법 (웹 뷰어)
+
+### 1. 가상환경에서 실행
+
+프로젝트 루트에 `.venv`(예: `python -m venv .venv`)를 만든 뒤, 의존성을 설치합니다.
+
+```bash
+pip install -r requirements.txt
+```
+
+이후 아래 스크립트로 웹 앱을 실행합니다.
+
+```bash
+./run.sh
+```
+
+또는 가상환경을 활성화한 상태에서 직접 실행할 수도 있습니다.
+
+```bash
+python app.py
+```
+
+성공적으로 실행되면 NiceGUI 서버가 기동되고, 브라우저에서 기본 주소(예: `http://localhost:8080` 또는 콘솔에 출력된 URL)를 열어 **철학 번역 뷰어**에 접속할 수 있습니다.
+
+### 2. 뷰어에서 할 수 있는 일
+
+- **기존 데이터 탐색**
+  - 상단의 **책 선택 탭**에서 DB에 저장된 책을 선택해 1:1 문장 매핑을 살펴볼 수 있습니다.
+  - 문장 번호로 특정 위치로 점프하거나, 무한 스크롤로 전체 문장을 내려보며 확인할 수 있습니다.
+- **새 책 추가 + 번역**
+  - **DB 관리 탭**에서 PDF를 업로드하고 저자/책 제목을 입력한 뒤 **추가** 버튼을 누르면,
+    - 전처리 그래프가 PDF에서 문장을 추출·정제 후 DB에 저장하고,
+    - 이어서 후처리 그래프가 미번역 문장을 번역하여 `korean_sentence` 컬럼을 채웁니다.
+- **책 데이터 삭제**
+  - 더 이상 필요 없는 책은 DB 관리 탭에서 선택 후 **삭제** 버튼을 통해 해당 책의 모든 문장을 DB에서 제거할 수 있습니다.
 
 ---
 
