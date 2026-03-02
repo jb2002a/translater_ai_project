@@ -20,7 +20,8 @@ from app_utils import (
     fetch_books,
     fetch_sentences,
     get_db_connection,
-    get_offset_by_id,
+    get_id_by_seq,
+    get_offset_by_seq,
 )
 
 try:
@@ -348,24 +349,25 @@ def mapping(request: Request):
 
     ui.label(f"총 {total}개 문장").classes("text-slate-500 text-sm mb-2")
 
-    # ID 검색 후 해당 위치로 스크롤
+    # 문장 번호 검색 후 해당 위치로 스크롤
     with ui.row().classes("items-center gap-2 mb-4"):
-        id_input = ui.input("ID", placeholder="문장 ID 입력").classes("w-36").props("type=number outlined dense")
+        seq_input = ui.input("문장 번호", placeholder=f"1 ~ {total}").classes("w-36").props("type=number outlined dense")
 
-        def go_to_id():
+        def go_to_seq():
             try:
-                sid = int((id_input.value or "").strip() or "0")
+                seq = int((seq_input.value or "").strip() or "0")
             except ValueError:
-                ui.notify("올바른 ID를 입력하세요.", type="warning")
+                ui.notify("올바른 문장 번호를 입력하세요.", type="warning")
                 return
-            if sid <= 0:
-                ui.notify("올바른 ID를 입력하세요.", type="warning")
+            if seq <= 0:
+                ui.notify("올바른 문장 번호를 입력하세요.", type="warning")
                 return
             conn = get_db_connection()
-            target = get_offset_by_id(conn, author, book_title, sid)
+            target = get_offset_by_seq(conn, author, book_title, seq)
+            sid = get_id_by_seq(conn, author, book_title, seq)
             conn.close()
-            if target is None:
-                ui.notify("이 책에 해당 ID가 없습니다.", type="warning")
+            if target is None or sid is None:
+                ui.notify(f"문장 번호는 1 ~ {total} 범위여야 합니다.", type="warning")
                 return
             while offset["value"] <= target and has_more["value"]:
                 load_more()
@@ -374,7 +376,7 @@ def mapping(request: Request):
                 "if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });"
             )
 
-        ui.button("이동", on_click=go_to_id).props("unelevated")
+        ui.button("이동", on_click=go_to_seq).props("unelevated")
 
     ui.separator()
 

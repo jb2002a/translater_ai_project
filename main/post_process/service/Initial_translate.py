@@ -1,9 +1,8 @@
 # This file handles the initial translation of pre-processed German text into Korean
 
 from concurrent.futures import ThreadPoolExecutor
-
 from typing import List, Tuple
-
+import langsmith as ls
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
@@ -12,7 +11,7 @@ from ...models import models
 from ..prompts.prompts import TRANSLATION_PROMPT
 
 # 병렬 번역 시 최대 동시 LLM 호출 수 (API rate limit 고려)
-_MAX_PARALLEL_WORKERS = 5
+_MAX_PARALLEL_WORKERS = 10
 
 
 class TranslationResult(BaseModel):
@@ -45,7 +44,8 @@ def _translate_single_chunk(
         SystemMessage(content=system_prompt),
         HumanMessage(content=human_message),
     ]
-    result = structured_chat.invoke(messages)
+    with ls.tracing_context(enabled=False):
+        result = structured_chat.invoke(messages)
     return [(t.pk, t.text) for t in result.translations]
 
 

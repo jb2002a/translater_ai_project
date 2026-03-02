@@ -55,29 +55,38 @@ def count_sentences(conn: sqlite3.Connection, author: str, book_title: str) -> i
     return cur.fetchone()[0]
 
 
-def get_offset_by_id(
-    conn: sqlite3.Connection, author: str, book_title: str, sentence_id: int
+def get_offset_by_seq(
+    conn: sqlite3.Connection, author: str, book_title: str, seq_num: int
 ) -> int | None:
-    """해당 책에서 sentence_id의 0-based 순서(offset). 없으면 None."""
+    """
+    해당 책에서 문장 번호(1-based)로 0-based offset 반환.
+    범위를 벗어나면 None.
+    """
+    total = count_sentences(conn, author, book_title)
+    if seq_num < 1 or seq_num > total:
+        return None
+    return seq_num - 1
+
+
+def get_id_by_seq(
+    conn: sqlite3.Connection, author: str, book_title: str, seq_num: int
+) -> int | None:
+    """해당 책에서 문장 번호(1-based)에 해당하는 id 반환. 범위를 벗어나면 None."""
+    total = count_sentences(conn, author, book_title)
+    if seq_num < 1 or seq_num > total:
+        return None
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT COUNT(*) FROM processed_sentences
-        WHERE author = ? AND book_title = ? AND id < ?
+        SELECT id FROM processed_sentences
+        WHERE author = ? AND book_title = ?
+        ORDER BY id
+        LIMIT 1 OFFSET ?
         """,
-        (author, book_title, sentence_id),
+        (author, book_title, seq_num - 1),
     )
-    count = cur.fetchone()[0]
-    cur.execute(
-        """
-        SELECT 1 FROM processed_sentences
-        WHERE author = ? AND book_title = ? AND id = ?
-        """,
-        (author, book_title, sentence_id),
-    )
-    if cur.fetchone() is None:
-        return None
-    return count
+    row = cur.fetchone()
+    return row[0] if row else None
 
 
 def check_duplicate_book(
