@@ -31,3 +31,16 @@ def get_chat_model_google():
         max_output_tokens=65536,
         thinking_budget=0,
     )
+
+
+# for post-processing (translation)
+def get_chat_model_google_translation():
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise MissingConfigError("GOOGLE_API_KEY 환경변수가 설정되지 않았습니다.")
+    return ChatGoogleGenerativeAI(
+        model="gemini-2.5-pro",
+        api_key=api_key,
+        max_output_tokens=65536,
+        thinking_budget=8192,
+    )

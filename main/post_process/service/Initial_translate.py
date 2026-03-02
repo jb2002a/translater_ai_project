@@ -37,7 +37,7 @@ def initial_translate_batch(
         return []
 
     try:
-        chat = models.get_chat_model_anthropic()
+        chat = models.get_chat_model_google_translation()
         structured_chat = chat.with_structured_output(BatchTranslationResult)
         system_prompt = TRANSLATION_PROMPT.format(AUTHOR=author, BOOK_TITLE=book_title)
         parts = []
@@ -53,4 +53,4 @@ def initial_translate_batch(
     except TranslaterAIError:
         raise
     except Exception as e:
-        raise LLMProviderError("Anthropic 번역 API 호출 실패", cause=e) from e
+        raise LLMProviderError("Gemini 번역 API 호출 실패", cause=e) from e
