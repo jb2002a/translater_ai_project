@@ -1,10 +1,11 @@
 """
-철학 번역 DB 뷰어 - 책 선택 + 1:1 매핑
+철학 번역 DB 뷰어 - 책 선택 + 1:1 매핑 (NiceGUI, 무한 스크롤)
 """
-import html
 import sqlite3
+from urllib.parse import quote_plus, unquote_plus
 
-import streamlit as st
+from fastapi import Request
+from nicegui import ui
 
 from app_utils import (
     DB_PATH,
@@ -16,164 +17,144 @@ from app_utils import (
 )
 
 
-def render_book_select():
+def _sentence_card(container: ui.column, row_id: int, german: str, korean: str, seq: int) -> None:
+    """문장 카드 하나를 container에 추가"""
+    with container:
+        with ui.card().classes("w-full p-4 my-2 bg-slate-50 border border-slate-200 rounded-lg"):
+            ui.label(f"문장 {seq} · ID: {row_id}").classes("text-xs text-slate-400")
+            ui.label("독일어").classes("text-xs text-slate-500")
+            ui.label(german or "").classes("text-base leading-relaxed whitespace-pre-wrap")
+            ui.label("한국어").classes("text-xs text-slate-500 mt-3")
+            ui.label(korean or "").classes("text-base leading-relaxed whitespace-pre-wrap")
+
+
+@ui.page("/")
+def book_select():
     """책 선택 페이지"""
-    st.title("📖 철학 번역 뷰어")
-    st.caption("독일어 ↔ 한국어 문장 1:1 매핑")
+    ui.label("철학 번역 뷰어").classes("text-2xl font-bold")
+    ui.label("독일어 ↔ 한국어 문장 1:1 매핑").classes("text-slate-500 text-sm")
 
     if not DB_PATH.exists():
-        st.error(f"DB 파일을 찾을 수 없습니다: {DB_PATH}")
+        ui.notify(f"DB 파일을 찾을 수 없습니다: {DB_PATH}", type="negative")
         return
 
     conn = get_db_connection()
     try:
         books = fetch_books(conn)
     except sqlite3.Error as e:
-        st.error(f"DB 조회 실패: {e}")
+        ui.notify(f"DB 조회 실패: {e}", type="negative")
         conn.close()
         return
     finally:
         conn.close()
 
     if not books:
-        st.warning("등록된 책이 없습니다.")
+        ui.label("등록된 책이 없습니다.").classes("text-amber-600")
         return
 
-    st.subheader("📚 책 선택")
+    options = [
+        {"label": f"{author} — {book_title} ({cnt}문장)", "value": (author, book_title)}
+        for author, book_title, cnt in books
+    ]
+    labels = [o["label"] for o in options]
+    value_to_pair = {o["label"]: o["value"] for o in options}
 
-    options = [f"{author} — {book_title} ({cnt}문장)" for author, book_title, cnt in books]
-    book_data = {opt: (author, book_title) for opt, (author, book_title, _) in zip(options, books)}
+    select = ui.select(
+        options=labels,
+        label="보고 싶은 책을 선택하세요",
+    ).classes("w-full max-w-md")
 
-    selected_label = st.selectbox(
-        "보고 싶은 책을 선택하세요",
-        options=options,
-        key="book_select",
-    )
+    def open_book():
+        label = select.value
+        if not label:
+            ui.notify("책을 선택하세요.", type="warning")
+            return
+        author, book_title = value_to_pair[label]
+        ui.navigate.to(f"/mapping?author={quote_plus(author)}&book_title={quote_plus(book_title)}")
 
-    if st.button("📄 이 책 보기", type="primary"):
-        if selected_label:
-            author, book_title = book_data[selected_label]
-            st.session_state["selected_book"] = {"author": author, "book_title": book_title}
-            st.session_state["current_page"] = "mapping"
-            st.rerun()
+    ui.button("이 책 보기", on_click=open_book).props("unelevated color=primary").classes("mt-2")
 
 
-def render_mapping():
-    """1:1 매핑 페이지"""
-    selected = st.session_state.get("selected_book")
-    if not selected:
-        st.session_state["current_page"] = "select"
-        st.rerun()
+@ui.page("/mapping")
+def mapping(request: Request):
+    """1:1 매핑 페이지 (무한 스크롤)"""
+    author = request.query_params.get("author") or ""
+    book_title = request.query_params.get("book_title") or ""
+    author = unquote_plus(author)
+    book_title = unquote_plus(book_title)
+
+    if not author or not book_title:
+        ui.navigate.to("/")
         return
 
-    author = selected["author"]
-    book_title = selected["book_title"]
-
-    st.title("뷰어")
-    st.caption(f"{author} — {book_title}")
-
-    if st.button("다른 책 선택"):
-        if "selected_book" in st.session_state:
-            del st.session_state["selected_book"]
-        st.session_state["current_page"] = "select"
-        st.rerun()
-
-    st.markdown("---")
+    # 헤더
+    with ui.row().classes("w-full items-center justify-between flex-wrap gap-2"):
+        ui.label(f"뷰어 — {author} · {book_title}").classes("text-xl font-semibold")
+        ui.button("다른 책 선택", on_click=lambda: ui.navigate.to("/")).props("flat")
 
     conn = get_db_connection()
     total = count_sentences(conn, author, book_title)
-    total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
     conn.close()
 
-    mapping_page = st.session_state.get("mapping_page", 1)
-    mapping_page = max(1, min(mapping_page, total_pages))
-    st.session_state["mapping_page"] = mapping_page
+    ui.label(f"총 {total}개 문장").classes("text-slate-500 text-sm mb-4")
+    ui.separator()
 
-    page = st.number_input(
-        "페이지",
-        min_value=1,
-        max_value=total_pages,
-        value=mapping_page,
-        step=1,
-        format="%d",
-    )
-    st.session_state["mapping_page"] = page
-    offset = (page - 1) * PAGE_SIZE
+    # 카드만 담는 컨테이너 (무한 스크롤 시 여기에 추가)
+    cards_container = ui.column().classes("w-full")
+    offset = {"value": 0}
+    has_more = {"value": True}
 
-    st.info(f"총 **{total}**개 문장 (페이지 {page}/{total_pages})")
+    def load_more():
+        if not has_more["value"]:
+            return
+        conn = get_db_connection()
+        rows = fetch_sentences(conn, author, book_title, offset["value"], PAGE_SIZE)
+        conn.close()
+        n = len(rows)
+        if n == 0:
+            has_more["value"] = False
+            return
+        start_seq = offset["value"] + 1
+        for i, (row_id, german, korean) in enumerate(rows):
+            _sentence_card(cards_container, row_id, german, korean, start_seq + i)
+        offset["value"] += n
+        if n < PAGE_SIZE:
+            has_more["value"] = False
+            sentinel.set_visibility(False)
+            end_label.set_visibility(True)
+            ui.run_javascript("if (window.__scrollObserver) { window.__scrollObserver.disconnect(); window.__scrollObserver = null; }")
 
-    conn = get_db_connection()
-    rows = fetch_sentences(conn, author, book_title, offset, PAGE_SIZE)
-    conn.close()
+    # 숨겨진 버튼: JS에서 sentinel 진입 시 클릭 유도
+    load_more_btn = ui.button("", on_click=load_more).props("id=load-more-btn").style("display: none")
+    # sentinel: 스크롤 시 이 요소가 보이면 load_more 트리거
+    sentinel = ui.element("div").props("id=scroll-sentinel").classes("h-4 w-full")
+    end_label = ui.label("모든 문장을 불러왔습니다.").classes("text-slate-500 text-sm py-4").set_visibility(False)
 
-    if not rows:
-        st.warning("문장이 없습니다.")
-        return
+    # 첫 배치 로드
+    load_more()
 
-    st.markdown("""
-    <style>
-    .sentence-card {
-        padding: 1rem 1.25rem;
-        margin: 1rem 0;
-        border-radius: 8px;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-    }
-    .sentence-card .label {
-        font-size: 0.75rem;
-        color: #64748b;
-        margin-bottom: 0.25rem;
-    }
-    .sentence-card .text {
-        font-size: 0.95rem;
-        line-height: 1.6;
-        color: #1e293b;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    for i, row in enumerate(rows):
-        row_id, german, korean = row
-        german = html.escape(german or "").replace("\n", "<br>")
-        korean = html.escape(korean or "").replace("\n", "<br>")
-        seq = offset + i + 1
-
-        st.markdown(f"""
-        <div class="sentence-card">
-            <div class="label">문장 {seq} · ID: {row_id}</div>
-            <div class="label">독일어</div>
-            <div class="text">{german}</div>
-            <div class="label" style="margin-top: 0.75rem;">한국어</div>
-            <div class="text">{korean}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("---")
-    col_prev, col_info, col_next = st.columns([1, 2, 1])
-    with col_prev:
-        if st.button("이전", key="prev_page", disabled=(page <= 1)):
-            st.session_state["mapping_page"] = page - 1
-            st.rerun()
-    with col_info:
-        st.markdown(f"<p style='text-align:center;margin:0.5rem 0;color:#64748b;'>페이지 {page} / {total_pages}</p>", unsafe_allow_html=True)
-    with col_next:
-        if st.button("다음", key="next_page", disabled=(page >= total_pages)):
-            st.session_state["mapping_page"] = page + 1
-            st.rerun()
+    # IntersectionObserver: sentinel이 뷰포트에 들어오면 load_more 버튼 클릭
+    observer_js = """
+    (function() {
+        var sentinel = document.getElementById('scroll-sentinel');
+        var btn = document.getElementById('load-more-btn');
+        if (!sentinel || !btn) return;
+        window.__scrollObserver = new IntersectionObserver(function(entries) {
+            if (entries[0].isIntersecting) btn.click();
+        }, { rootMargin: '100px' });
+        window.__scrollObserver.observe(sentinel);
+    })();
+    """
+    ui.run_javascript(observer_js)
 
 
 def main():
-    st.set_page_config(
-        page_title="철학 번역 뷰어",
-        page_icon="📖",
-        layout="wide",
+    ui.run(
+        title="철학 번역 뷰어",
+        favicon="📖",
+        storage_secret="philosophy-viewer-secret",
     )
 
-    if st.session_state.get("current_page") == "mapping":
-        render_mapping()
-    else:
-        render_book_select()
 
-
-if __name__ == "__main__":
+if __name__ in {"__main__", "__mp_main__"}:
     main()
