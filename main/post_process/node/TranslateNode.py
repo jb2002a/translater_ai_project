@@ -14,16 +14,19 @@ def _require(state: PostTranslationState, key: str):
     return state[key]
 
 
-# 5000토큰 내의 독일어 문장 청킹
+# 5000토큰 내의 미번역 독일어 문장 조회 (id 순)
 def fetch_sentences_node(state: PostTranslationState) -> dict:
     try:
-        _require(state, "db_path")
-        items, state_updates = fetch_german_sentences_within_tokens(state)
-        # state 업데이트 pending_items, current_pk(state_updates)
-        return {
-            "pending_items": items,
-            **state_updates,
-        }
+        db_path = _require(state, "db_path")
+        author = _require(state, "author")
+        book_title = _require(state, "book_title")
+
+        items = fetch_german_sentences_within_tokens(
+            db_path=db_path,
+            author=author,
+            book_title=book_title,
+        )
+        return {"pending_items": items}
     except TranslaterAIError:
         raise
 

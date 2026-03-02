@@ -105,7 +105,7 @@ translater_ai_project/
 │       │   └── TranslateNode.py
 │       ├── service/
 │       │   ├── Initial_translate.py
-│       │   └── TranslationDbService.py   # get_next_start_pk, fetch, save
+│       │   └── TranslationDbService.py   # has_untranslated_sentences, fetch, save
 │       └── prompts/
 │           └── prompts.py
 ├── config.py                     # OS별 기본 PDF 경로 (DEFAULT_PDF_PATH)
@@ -187,25 +187,23 @@ final_output = app.invoke(initial_state)
 python -m main.post_process.graph
 ```
 
-스크립트 실행 시 `get_next_start_pk`로 미번역 문장의 시작 `id`를 조회한 뒤, 해당 시점부터 5000토큰 단위로 배치 번역을 수행함. 미번역 문장이 없으면 종료함.
+스크립트 실행 시 `has_untranslated_sentences`로 미번역 문장 존재 여부를 확인한 뒤, `korean_sentence IS NULL` 조건의 문장을 id 순으로 5000토큰 단위 배치 번역함. 미번역 문장이 없으면 종료함.
 
 ```python
 from main.post_process.graph import create_translation_workflow
-from main.post_process.service.TranslationDbService import get_next_start_pk
+from main.post_process.service.TranslationDbService import has_untranslated_sentences
 import config
 
 app = create_translation_workflow()
 db_path = getattr(config, "DEFAULT_DB_PATH", "philosophy_translation.db")
 author = "Dilthey, Wilhelm"
 book_title = "Dilthey, Wilhelm: Einleitung in die Geisteswissenschaften. ..."
-start_pk = get_next_start_pk(db_path, author, book_title)
 
-if start_pk > 0:
+if has_untranslated_sentences(db_path, author, book_title):
     initial_state = {
         "db_path": db_path,
-        "author": "Dilthey, Wilhelm",
-        "book_title": "...",
-        "current_pk": start_pk,
+        "author": author,
+        "book_title": book_title,
     }
     app.invoke(initial_state)
 ```

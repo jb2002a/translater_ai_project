@@ -19,7 +19,6 @@ class PostTranslationState(TypedDict, total=False):
     db_path: str
     author: str
     book_title: str
-    current_pk: int
     pending_items: List[Tuple[int, str]]
     translated_items: List[Tuple[int, str]]
     last_saved_count: int
