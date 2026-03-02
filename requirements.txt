@@ -9,3 +9,4 @@ langchain-core
 langchain-anthropic
 langchain-google-genai
 langgraph
+pydantic>=2.0.0
