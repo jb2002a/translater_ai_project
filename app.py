@@ -5,10 +5,12 @@ import asyncio
 import os
 import sqlite3
 import tempfile
+import uuid
 from pathlib import Path
 from urllib.parse import quote_plus, unquote_plus
 
 from fastapi import Request
+from nicegui import app as ng_app
 from nicegui import ui
 
 from app_utils import (
@@ -49,6 +51,35 @@ def _debug_log(location: str, message: str, data: dict, hypothesis_id: str = "")
             f.write(_json.dumps(payload, ensure_ascii=False) + "\n")
     except Exception:
         pass
+
+
+# NiceGUI ui.upload는 클라이언트 삭제 시 RuntimeError를 내므로, 클라이언트 무관 업로드용 저장소
+_upload_path_by_token: dict[str, str] = {}
+
+
+@ng_app.post("/api/upload-pdf")
+async def api_upload_pdf(request: Request):
+    """PDF 파일을 받아 임시 저장하고, 토큰으로 경로를 등록. (클라이언트 삭제와 무관하게 동작)"""
+    try:
+        form = await request.form()
+        token = (form.get("token") or "").strip() or None
+        file = form.get("file")
+        if not token or not file or not hasattr(file, "read"):
+            return {"error": "missing token or file"}
+        content = await file.read()
+        if not content:
+            return {"error": "empty file"}
+        name = getattr(file, "filename", None) or "upload.pdf"
+        suffix = Path(name).suffix or ".pdf"
+        fd, path = tempfile.mkstemp(suffix=suffix)
+        try:
+            os.write(fd, content)
+        finally:
+            os.close(fd)
+        _upload_path_by_token[token] = path
+        return {"upload_id": token}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 def _sentence_card(container: ui.column, row_id: int, german: str, korean: str, seq: int) -> None:
@@ -185,6 +216,7 @@ def book_select():
             ).classes("text-slate-600 text-sm mb-2")
 
             pdf_path_holder: dict = {"path": None}
+            upload_token = str(uuid.uuid4())
 
             with ui.card().classes("w-full max-w-lg p-4 mb-4"):
                 author_input = ui.input("저자").classes("w-full").props("outlined dense")
@@ -192,47 +224,49 @@ def book_select():
                     "outlined dense"
                 )
 
-                async def on_upload(e):
-                    # #region agent log
-                    _debug_log("app.py:on_upload_start", "on_upload called", {"has_file": hasattr(e, "file")}, "H4")
-                    # #endregion
-                    name = getattr(e.file, "name", None) or "upload.pdf"
-                    suffix = Path(name).suffix or ".pdf"
-                    fd, path = tempfile.mkstemp(suffix=suffix)
-                    fd_closed = False
-                    try:
-                        content = await e.file.read()
-                        if not content:
-                            ui.notify("업로드된 파일이 비어 있습니다.", type="warning")
-                            os.close(fd)
-                            fd_closed = True
-                            try:
-                                os.unlink(path)
-                            except OSError:
-                                pass
-                            return
-                        os.write(fd, content)
-                    except Exception as ex:
-                        # #region agent log
-                        _debug_log("app.py:on_upload_exception", "exception during read", {"error": str(ex)}, "H3")
-                        # #endregion
-                        raise
-                    finally:
-                        if not fd_closed:
-                            os.close(fd)
-                    pdf_path_holder["path"] = path
-
-                upload = ui.upload(
-                    label="PDF 파일",
-                    on_upload=on_upload,
-                    auto_upload=True,
-                ).classes("w-full").props("accept=.pdf")
+                # NiceGUI ui.upload 대신 클라이언트 무관 API 업로드 (EC2 등에서 "client deleted" 방지)
+                ui.element("span").props(f"id=pdf-upload-token data-token={upload_token}").style("display:none")
+                with ui.column().classes("w-full"):
+                    ui.label("PDF 파일").classes("text-sm text-slate-600")
+                    ui.element("input").props("type=file accept=.pdf id=pdf-file-input").classes("w-full")
+                    ui.label("").classes("text-sm text-green-600 mt-1").props("id=pdf-upload-status")
+                ui.run_javascript(
+                    """
+                    (function(){
+                      var input = document.getElementById('pdf-file-input');
+                      var tokenEl = document.getElementById('pdf-upload-token');
+                      var statusEl = document.getElementById('pdf-upload-status');
+                      if (!input || !tokenEl || !statusEl) return;
+                      input.addEventListener('change', function(){
+                        var token = tokenEl.getAttribute('data-token');
+                        var file = input.files && input.files[0];
+                        if (!token || !file) return;
+                        var fd = new FormData();
+                        fd.append('token', token);
+                        fd.append('file', file);
+                        statusEl.textContent = '업로드 중...';
+                        fetch('/api/upload-pdf', { method: 'POST', body: fd })
+                          .then(function(r){ return r.json(); })
+                          .then(function(data){
+                            statusEl.textContent = data.error ? ('오류: ' + data.error) : 'PDF 업로드됨.';
+                          })
+                          .catch(function(){ statusEl.textContent = '업로드 실패'; });
+                        input.value = '';
+                      });
+                    })();
+                    """
+                )
 
                 progress_log = ui.log(max_lines=20).classes("w-full h-32 mt-2")
                 progress_spinner = ui.spinner(size="lg")
                 progress_spinner.set_visibility(False)
 
                 async def do_add():
+                    # 토큰 기반 API 업로드 경로가 있으면 holder에 넣기
+                    if not pdf_path_holder.get("path"):
+                        path_from_api = _upload_path_by_token.pop(upload_token, None)
+                        if path_from_api:
+                            pdf_path_holder["path"] = path_from_api
                     # #region agent log
                     _debug_log("app.py:do_add_start", "do_add called", {"has_path": bool(pdf_path_holder.get("path"))}, "H1,H5")
                     # #endregion
