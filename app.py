@@ -241,19 +241,24 @@ def book_select():
                         ui.notify("저자와 책 제목을 모두 입력하세요.", type="warning")
                         return
 
-                    upload_id = await ui.run_javascript(
-                        "window.__pdfUploadId || null"
-                    )
-                    print(f"[do_add] upload_id from JS: {upload_id}")
+                    try:
+                        upload_id = await ui.run_javascript(
+                            "window.__pdfUploadId || ''", timeout=5.0
+                        )
+                    except Exception as e:
+                        print(f"[do_add] JS 호출 에러: {e}")
+                        upload_id = None
 
-                    if not upload_id:
+                    print(f"[do_add] upload_id from JS: {repr(upload_id)}")
+
+                    if not upload_id or not isinstance(upload_id, str) or len(upload_id) < 10:
                         ui.notify("PDF 파일을 먼저 업로드하세요.", type="warning")
                         return
 
                     pdf_path = str(_get_upload_path(upload_id))
                     if not Path(pdf_path).exists():
-                        print(f"[do_add] 파일 없음: {pdf_path}")
-                        ui.notify("PDF 파일을 먼저 업로드하세요.", type="warning")
+                        print(f"[do_add] 파일 없음: {pdf_path}, UPLOAD_DIR 내용: {list(UPLOAD_DIR.iterdir())}")
+                        ui.notify("PDF 파일을 먼저 업로드하세요. (파일을 찾을 수 없음)", type="warning")
                         return
 
                     print(f"[do_add] 파일 확인됨: {pdf_path}")
@@ -487,10 +492,14 @@ def mapping(request: Request):
 
 
 def main():
+    import uvicorn
     ui.run(
         title="철학 번역 뷰어",
         favicon="📖",
         storage_secret="philosophy-viewer-secret",
+        host="0.0.0.0",
+        port=8000,
+        show=False,
     )
 
 
