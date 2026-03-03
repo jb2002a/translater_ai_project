@@ -48,26 +48,15 @@ def _translate_single_chunk(
 
 
 def initial_translate_batch(
-    items: List[List[Tuple[int, str]]],
-    author: str,
-    book_title: str,
-    *,
-    max_chunks: int | None = None,
+    items: List[List[Tuple[int, str]]], author: str, book_title: str
 ) -> List[Tuple[int, str]]:
     """
     전처리된 독일어 문장 청크들을 병렬로 한국어 번역.
     각 청크는 한 번의 LLM 호출로 번역된다.
     author, book_title은 시스템 프롬프트에 반영된다.
-
-    max_chunks가 없으면 청크 1개만 번역한다. 지정 시 해당 개수만큼만 처리.
     """
     if not items:
         return []
-
-    if max_chunks is None:
-        items = items[:1]
-    else:
-        items = items[:max_chunks]
 
     try:
         workers = min(_MAX_PARALLEL_WORKERS, len(items))
