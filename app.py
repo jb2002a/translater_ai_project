@@ -154,12 +154,12 @@ def book_select():
                 )
 
                 async def on_upload(e):
-                    name = getattr(e, "name", None) or "upload.pdf"
+                    name = e.file.name
                     suffix = Path(name).suffix or ".pdf"
                     fd, path = tempfile.mkstemp(suffix=suffix)
                     fd_closed = False
                     try:
-                        content = e.content.read()
+                        content = await e.file.read()
                         if not content:
                             ui.notify("업로드된 파일이 비어 있습니다.", type="warning")
                             os.close(fd)
