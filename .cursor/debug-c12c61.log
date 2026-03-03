@@ -1,0 +1,2 @@
+{"sessionId": "c12c61", "location": "app.py:book_select_entry", "message": "page / entered", "data": {"ts": 1772523585.445993}, "timestamp": 1772523585445, "hypothesisId": "H2"}
+{"sessionId": "c12c61", "location": "app.py:on_upload_start", "message": "on_upload called", "data": {"has_file": true}, "timestamp": 1772523590531, "hypothesisId": "H4"}

@@ -278,6 +278,13 @@ python app.py
 - **책 데이터 삭제**
   - 더 이상 필요 없는 책은 DB 관리 탭에서 선택 후 **삭제** 버튼을 통해 해당 책의 모든 문장을 DB에서 제거할 수 있습니다.
 
+### 3. Docker / EC2 배포 시
+
+- `app.py`를 수정한 뒤에는 **반드시 Docker 이미지를 다시 빌드**한 다음 컨테이너를 재기동해야 합니다.  
+  (예: `docker build -t trans-ai . && docker stop trans-ai-service; docker run -d ...`)
+- PDF 업로드 시 `RuntimeError: The client this element belongs to has been deleted` 가 나오면,  
+  `reconnect_timeout=7200` 이 적용된 최신 `app.py` 로 이미지를 다시 빌드·배포했는지 확인하세요.
+
 ---
 
 ## 데이터베이스
