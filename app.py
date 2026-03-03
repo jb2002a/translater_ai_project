@@ -5,12 +5,10 @@ import asyncio
 import os
 import sqlite3
 import tempfile
-import uuid
 from pathlib import Path
 from urllib.parse import quote_plus, unquote_plus
 
 from fastapi import Request
-from nicegui import app as ng_app
 from nicegui import ui
 
 from app_utils import (
@@ -30,56 +28,6 @@ try:
     from main.exceptions import TranslaterAIError
 except ImportError:
     TranslaterAIError = Exception
-
-# 디버그 세션 c12c61: EC2에서 PDF 업로드 후 초기화면 복귀 원인 수집
-_DEBUG_LOG = Path(__file__).resolve().parent / ".cursor" / "debug-c12c61.log"
-
-def _debug_log(location: str, message: str, data: dict, hypothesis_id: str = ""):
-    import json as _json
-    import time as _time
-    payload = {
-        "sessionId": "c12c61",
-        "location": location,
-        "message": message,
-        "data": data,
-        "timestamp": int(_time.time() * 1000),
-    }
-    if hypothesis_id:
-        payload["hypothesisId"] = hypothesis_id
-    try:
-        with open(_DEBUG_LOG, "a", encoding="utf-8") as f:
-            f.write(_json.dumps(payload, ensure_ascii=False) + "\n")
-    except Exception:
-        pass
-
-
-# NiceGUI ui.upload는 클라이언트 삭제 시 RuntimeError를 내므로, 클라이언트 무관 업로드용 저장소
-_upload_path_by_token: dict[str, str] = {}
-
-
-@ng_app.post("/api/upload-pdf")
-async def api_upload_pdf(request: Request):
-    """PDF 파일을 받아 임시 저장하고, 토큰으로 경로를 등록. (클라이언트 삭제와 무관하게 동작)"""
-    try:
-        form = await request.form()
-        token = (form.get("token") or "").strip() or None
-        file = form.get("file")
-        if not token or not file or not hasattr(file, "read"):
-            return {"error": "missing token or file"}
-        content = await file.read()
-        if not content:
-            return {"error": "empty file"}
-        name = getattr(file, "filename", None) or "upload.pdf"
-        suffix = Path(name).suffix or ".pdf"
-        fd, path = tempfile.mkstemp(suffix=suffix)
-        try:
-            os.write(fd, content)
-        finally:
-            os.close(fd)
-        _upload_path_by_token[token] = path
-        return {"upload_id": token}
-    except Exception as e:
-        return {"error": str(e)}
 
 
 def _sentence_card(container: ui.column, row_id: int, german: str, korean: str, seq: int) -> None:
@@ -127,12 +75,9 @@ def _run_postprocess(db_path: str, author: str, book_title: str):
     return app.invoke(initial_state)
 
 
-@ui.page("/", reconnect_timeout=7200)
+@ui.page("/")
 def book_select():
-    """메인 페이지: 책 선택 탭 + DB 관리 탭 (reconnect_timeout=2h: 장시간 PDF 처리 중 끊겨도 재연결 시 세션 유지)"""
-    # #region agent log
-    _debug_log("app.py:book_select_entry", "page / entered", {"ts": __import__("time").time()}, "H2")
-    # #endregion
+    """메인 페이지: 책 선택 탭 + DB 관리 탭"""
     ui.label("철학 번역 뷰어").classes("text-2xl font-bold")
     ui.label("독일어 ↔ 한국어 문장 1:1 매핑").classes("text-slate-500 text-sm")
 
@@ -146,22 +91,7 @@ def book_select():
     with ui.tabs().classes("w-full mt-4") as tabs:
         tab_books = ui.tab("책 선택")
         tab_manage = ui.tab("DB 관리")
-    # 재연결 후에도 DB 관리 탭 유지: 저장된 탭이 있으면 해당 탭으로 복원
-    try:
-        storage = ui.storage.user
-        initial_tab = tab_manage if storage.get("db_manage_tab_active") else tab_books
-    except Exception:
-        initial_tab = tab_books
-
-    def _save_active_tab(e):
-        try:
-            ui.storage.user["db_manage_tab_active"] = (getattr(e, "args", None) is tab_manage)
-        except Exception:
-            pass
-
-    tab_panels = ui.tab_panels(tabs, value=initial_tab).classes("w-full")
-    tabs.on_value_change(_save_active_tab)
-    with tab_panels:
+    with ui.tab_panels(tabs, value=tab_books).classes("w-full"):
         # ----- 책 선택 탭 -----
         with ui.tab_panel(tab_books):
             select = ui.select(
@@ -216,7 +146,6 @@ def book_select():
             ).classes("text-slate-600 text-sm mb-2")
 
             pdf_path_holder: dict = {"path": None}
-            upload_token = str(uuid.uuid4())
 
             with ui.card().classes("w-full max-w-lg p-4 mb-4"):
                 author_input = ui.input("저자").classes("w-full").props("outlined dense")
@@ -224,64 +153,45 @@ def book_select():
                     "outlined dense"
                 )
 
-                # NiceGUI ui.upload 대신 클라이언트 무관 API 업로드 (EC2 등에서 "client deleted" 방지)
-                ui.element("span").props(f"id=pdf-upload-token data-token={upload_token}").style("display:none")
-                with ui.column().classes("w-full"):
-                    ui.label("PDF 파일").classes("text-sm text-slate-600")
-                    file_input = ui.element("input").props("type=file accept=.pdf id=pdf-file-input").classes("w-full").style("display: none")
-                    ui.button("PDF 선택 (업로드)", on_click=lambda: ui.run_javascript("document.getElementById('pdf-file-input').click();")).props(
-                        "outlined"
-                    ).classes("mt-1")
-                    ui.label("").classes("text-sm text-green-600 mt-1").props("id=pdf-upload-status")
-                ui.run_javascript(
-                    """
-                    (function(){
-                      var input = document.getElementById('pdf-file-input');
-                      var tokenEl = document.getElementById('pdf-upload-token');
-                      var statusEl = document.getElementById('pdf-upload-status');
-                      if (!input || !tokenEl || !statusEl) return;
-                      input.addEventListener('change', function(){
-                        var token = tokenEl.getAttribute('data-token');
-                        var file = input.files && input.files[0];
-                        if (!token || !file) return;
-                        var fd = new FormData();
-                        fd.append('token', token);
-                        fd.append('file', file);
-                        statusEl.textContent = '업로드 중...';
-                        fetch('/api/upload-pdf', { method: 'POST', body: fd })
-                          .then(function(r){ return r.json(); })
-                          .then(function(data){
-                            statusEl.textContent = data.error ? ('오류: ' + data.error) : 'PDF 업로드됨.';
-                          })
-                          .catch(function(){ statusEl.textContent = '업로드 실패'; });
-                        input.value = '';
-                      });
-                    })();
-                    """
-                )
+                async def on_upload(e):
+                    name = getattr(e.file, "name", None) or "upload.pdf"
+                    suffix = Path(name).suffix or ".pdf"
+                    fd, path = tempfile.mkstemp(suffix=suffix)
+                    fd_closed = False
+                    try:
+                        content = await e.file.read()
+                        if not content:
+                            ui.notify("업로드된 파일이 비어 있습니다.", type="warning")
+                            os.close(fd)
+                            fd_closed = True
+                            try:
+                                os.unlink(path)
+                            except OSError:
+                                pass
+                            return
+                        os.write(fd, content)
+                    finally:
+                        if not fd_closed:
+                            os.close(fd)
+                    pdf_path_holder["path"] = path
+
+                upload = ui.upload(
+                    label="PDF 파일",
+                    on_upload=on_upload,
+                    auto_upload=True,
+                ).classes("w-full").props("accept=.pdf")
 
                 progress_log = ui.log(max_lines=20).classes("w-full h-32 mt-2")
                 progress_spinner = ui.spinner(size="lg")
                 progress_spinner.set_visibility(False)
 
                 async def do_add():
-                    # 토큰 기반 API 업로드 경로가 있으면 holder에 넣기
-                    if not pdf_path_holder.get("path"):
-                        path_from_api = _upload_path_by_token.pop(upload_token, None)
-                        if path_from_api:
-                            pdf_path_holder["path"] = path_from_api
-                    # #region agent log
-                    _debug_log("app.py:do_add_start", "do_add called", {"has_path": bool(pdf_path_holder.get("path"))}, "H1,H5")
-                    # #endregion
                     author_val = (author_input.value or "").strip()
                     book_val = (book_title_input.value or "").strip()
                     if not author_val or not book_val:
                         ui.notify("저자와 책 제목을 모두 입력하세요.", type="warning")
                         return
                     if not pdf_path_holder.get("path"):
-                        # #region agent log
-                        _debug_log("app.py:do_add_no_pdf", "PDF path is None", {"holder_keys": list(pdf_path_holder.keys())}, "H4,H5")
-                        # #endregion
                         ui.notify("PDF 파일을 업로드하세요.", type="warning")
                         return
 
@@ -309,27 +219,15 @@ def book_select():
                             _run_postprocess, db_path_str, author_val, book_val
                         )
                         progress_log.push("후처리 완료.")
-                        # #region agent log
-                        _debug_log("app.py:do_add_success", "후처리 완료 직후, notify 전", {}, "H1,H5")
-                        # #endregion
                         ui.notify("DB 추가 및 번역이 완료되었습니다.", type="positive")
                         refresh_book_list()
                     except TranslaterAIError as e:
-                        # #region agent log
-                        _debug_log("app.py:do_add_translator_error", "TranslaterAIError", {"error": str(e)}, "H3,H5")
-                        # #endregion
                         progress_log.push(f"오류: {e}")
                         ui.notify(f"처리 실패: {e}", type="negative")
                     except Exception as e:
-                        # #region agent log
-                        _debug_log("app.py:do_add_exception", "Exception", {"error": str(e), "type": type(e).__name__}, "H3,H5")
-                        # #endregion
                         progress_log.push(f"오류: {e}")
                         ui.notify(f"처리 중 오류: {e}", type="negative")
                     finally:
-                        # #region agent log
-                        _debug_log("app.py:do_add_finally", "do_add finally", {}, "H1,H5")
-                        # #endregion
                         if pdf_path and Path(pdf_path).exists():
                             try:
                                 Path(pdf_path).unlink()
@@ -404,7 +302,6 @@ def book_select():
 
             render_book_list()
 
-    # DB 관리 탭 선택 시 storage에 기록해 재연결 후에도 해당 탭 복원 (위 _save_active_tab에서 설정)
 
 @ui.page("/mapping")
 def mapping(request: Request):
@@ -522,7 +419,6 @@ def main():
         title="철학 번역 뷰어",
         favicon="📖",
         storage_secret="philosophy-viewer-secret",
-        reconnect_timeout=7200,  # 2시간: PDF 전/후처리 등 장시간 작업 중 연결 끊겨도 재연결 시 세션 유지
     )
 
 
