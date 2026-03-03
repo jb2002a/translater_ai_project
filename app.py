@@ -31,41 +31,35 @@ try:
 except ImportError:
     TranslaterAIError = Exception
 
-# 업로드된 파일 경로를 임시 보관 (upload_id -> file_path)
-_upload_store: dict[str, str] = {}
+# 업로드된 파일을 고정 디렉터리에 저장 (upload_id를 파일명으로 사용)
+UPLOAD_DIR = Path(tempfile.gettempdir()) / "trans_ai_uploads"
+UPLOAD_DIR.mkdir(exist_ok=True)
+
+
+def _get_upload_path(upload_id: str) -> Path:
+    """upload_id에 해당하는 파일 경로 반환."""
+    return UPLOAD_DIR / f"{upload_id}.pdf"
 
 
 @nicegui_app.post("/api/upload-pdf")
 async def upload_pdf_api(file: UploadFile = File(...)):
     """NiceGUI WebSocket 클라이언트와 독립적으로 PDF를 업로드하는 FastAPI 엔드포인트."""
     name = file.filename or "upload.pdf"
-    suffix = Path(name).suffix or ".pdf"
-    fd, path = tempfile.mkstemp(suffix=suffix)
     try:
         content = await file.read()
         if not content:
-            os.close(fd)
-            try:
-                os.unlink(path)
-            except OSError:
-                pass
             return JSONResponse({"error": "업로드된 파일이 비어 있습니다."}, status_code=400)
-        os.write(fd, content)
     except Exception as exc:
-        try:
-            os.close(fd)
-        except OSError:
-            pass
-        try:
-            os.unlink(path)
-        except OSError:
-            pass
         return JSONResponse({"error": str(exc)}, status_code=500)
-    else:
-        os.close(fd)
 
     upload_id = str(uuid.uuid4())
-    _upload_store[upload_id] = path
+    upload_path = _get_upload_path(upload_id)
+    try:
+        upload_path.write_bytes(content)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+    print(f"[upload-pdf] 업로드 완료: upload_id={upload_id}, path={upload_path}, size={len(content)}")
     return {"upload_id": upload_id, "filename": name}
 
 
@@ -250,11 +244,19 @@ def book_select():
                     upload_id = await ui.run_javascript(
                         "window.__pdfUploadId || null"
                     )
-                    if not upload_id or upload_id not in _upload_store:
+                    print(f"[do_add] upload_id from JS: {upload_id}")
+
+                    if not upload_id:
                         ui.notify("PDF 파일을 먼저 업로드하세요.", type="warning")
                         return
 
-                    pdf_path = _upload_store.pop(upload_id)
+                    pdf_path = str(_get_upload_path(upload_id))
+                    if not Path(pdf_path).exists():
+                        print(f"[do_add] 파일 없음: {pdf_path}")
+                        ui.notify("PDF 파일을 먼저 업로드하세요.", type="warning")
+                        return
+
+                    print(f"[do_add] 파일 확인됨: {pdf_path}")
 
                     conn = get_db_connection()
                     try:
