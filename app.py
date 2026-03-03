@@ -29,6 +29,27 @@ try:
 except ImportError:
     TranslaterAIError = Exception
 
+# 디버그 세션 c12c61: EC2에서 PDF 업로드 후 초기화면 복귀 원인 수집
+_DEBUG_LOG = Path(__file__).resolve().parent / ".cursor" / "debug-c12c61.log"
+
+def _debug_log(location: str, message: str, data: dict, hypothesis_id: str = ""):
+    import json as _json
+    import time as _time
+    payload = {
+        "sessionId": "c12c61",
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(_time.time() * 1000),
+    }
+    if hypothesis_id:
+        payload["hypothesisId"] = hypothesis_id
+    try:
+        with open(_DEBUG_LOG, "a", encoding="utf-8") as f:
+            f.write(_json.dumps(payload, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
 
 def _sentence_card(container: ui.column, row_id: int, german: str, korean: str, seq: int) -> None:
     """문장 카드 하나를 container에 추가 (id=sentence-{row_id}로 스크롤 이동 가능)"""
@@ -75,9 +96,12 @@ def _run_postprocess(db_path: str, author: str, book_title: str):
     return app.invoke(initial_state)
 
 
-@ui.page("/")
+@ui.page("/", reconnect_timeout=7200)
 def book_select():
-    """메인 페이지: 책 선택 탭 + DB 관리 탭"""
+    """메인 페이지: 책 선택 탭 + DB 관리 탭 (reconnect_timeout=2h: 장시간 PDF 처리 중 끊겨도 재연결 시 세션 유지)"""
+    # #region agent log
+    _debug_log("app.py:book_select_entry", "page / entered", {"ts": __import__("time").time()}, "H2")
+    # #endregion
     ui.label("철학 번역 뷰어").classes("text-2xl font-bold")
     ui.label("독일어 ↔ 한국어 문장 1:1 매핑").classes("text-slate-500 text-sm")
 
@@ -91,7 +115,22 @@ def book_select():
     with ui.tabs().classes("w-full mt-4") as tabs:
         tab_books = ui.tab("책 선택")
         tab_manage = ui.tab("DB 관리")
-    with ui.tab_panels(tabs, value=tab_books).classes("w-full"):
+    # 재연결 후에도 DB 관리 탭 유지: 저장된 탭이 있으면 해당 탭으로 복원
+    try:
+        storage = ui.storage.user
+        initial_tab = tab_manage if storage.get("db_manage_tab_active") else tab_books
+    except Exception:
+        initial_tab = tab_books
+
+    def _save_active_tab(e):
+        try:
+            ui.storage.user["db_manage_tab_active"] = (getattr(e, "args", None) is tab_manage)
+        except Exception:
+            pass
+
+    tab_panels = ui.tab_panels(tabs, value=initial_tab).classes("w-full")
+    tabs.on_value_change(_save_active_tab)
+    with tab_panels:
         # ----- 책 선택 탭 -----
         with ui.tab_panel(tab_books):
             select = ui.select(
@@ -155,20 +194,14 @@ def book_select():
 
                 async def on_upload(e):
                     # #region agent log
-                    import json as _json; open('/Users/leejaebin/Git/translater_ai_project/.cursor/debug-3c7733.log','a').write(_json.dumps({"sessionId":"3c7733","location":"app.py:on_upload_start","message":"on_upload called","data":{"e_type":str(type(e)),"has_file":hasattr(e,'file'),"e_attrs":[a for a in dir(e) if not a.startswith('_')],"file_attrs":[a for a in dir(e.file) if not a.startswith('_')] if hasattr(e,'file') else []},"timestamp":__import__('time').time()*1000,"hypothesisId":"A"})+'\n')
+                    _debug_log("app.py:on_upload_start", "on_upload called", {"has_file": hasattr(e, "file")}, "H4")
                     # #endregion
                     name = getattr(e.file, "name", None) or "upload.pdf"
                     suffix = Path(name).suffix or ".pdf"
                     fd, path = tempfile.mkstemp(suffix=suffix)
                     fd_closed = False
                     try:
-                        # #region agent log
-                        open('/Users/leejaebin/Git/translater_ai_project/.cursor/debug-3c7733.log','a').write(_json.dumps({"sessionId":"3c7733","location":"app.py:on_upload_before_read","message":"about to read file","data":{"file_type":str(type(e.file)),"has_read":hasattr(e.file,'read'),"read_callable":callable(getattr(e.file,'read',None))},"timestamp":__import__('time').time()*1000,"hypothesisId":"D"})+'\n')
-                        # #endregion
                         content = await e.file.read()
-                        # #region agent log
-                        open('/Users/leejaebin/Git/translater_ai_project/.cursor/debug-3c7733.log','a').write(_json.dumps({"sessionId":"3c7733","location":"app.py:on_upload_read","message":"file read result","data":{"content_len":len(content) if content else 0,"content_is_none":content is None,"content_type":str(type(content))},"timestamp":__import__('time').time()*1000,"hypothesisId":"B"})+'\n')
-                        # #endregion
                         if not content:
                             ui.notify("업로드된 파일이 비어 있습니다.", type="warning")
                             os.close(fd)
@@ -181,16 +214,13 @@ def book_select():
                         os.write(fd, content)
                     except Exception as ex:
                         # #region agent log
-                        import traceback as _tb; open('/Users/leejaebin/Git/translater_ai_project/.cursor/debug-3c7733.log','a').write(_json.dumps({"sessionId":"3c7733","location":"app.py:on_upload_exception","message":"exception during read","data":{"error":str(ex),"error_type":str(type(ex)),"traceback":_tb.format_exc()},"timestamp":__import__('time').time()*1000,"hypothesisId":"D"})+'\n')
+                        _debug_log("app.py:on_upload_exception", "exception during read", {"error": str(ex)}, "H3")
                         # #endregion
                         raise
                     finally:
                         if not fd_closed:
                             os.close(fd)
                     pdf_path_holder["path"] = path
-                    # #region agent log
-                    open('/Users/leejaebin/Git/translater_ai_project/.cursor/debug-3c7733.log','a').write(_json.dumps({"sessionId":"3c7733","location":"app.py:on_upload_end","message":"path saved","data":{"saved_path":path,"holder_id":id(pdf_path_holder)},"timestamp":__import__('time').time()*1000,"hypothesisId":"B,C"})+'\n')
-                    # #endregion
 
                 upload = ui.upload(
                     label="PDF 파일",
@@ -204,7 +234,7 @@ def book_select():
 
                 async def do_add():
                     # #region agent log
-                    import json as _json; open('/Users/leejaebin/Git/translater_ai_project/.cursor/debug-3c7733.log','a').write(_json.dumps({"sessionId":"3c7733","location":"app.py:do_add_start","message":"do_add called","data":{"holder_path":pdf_path_holder.get("path"),"holder_id":id(pdf_path_holder)},"timestamp":__import__('time').time()*1000,"hypothesisId":"C,E"})+'\n')
+                    _debug_log("app.py:do_add_start", "do_add called", {"has_path": bool(pdf_path_holder.get("path"))}, "H1,H5")
                     # #endregion
                     author_val = (author_input.value or "").strip()
                     book_val = (book_title_input.value or "").strip()
@@ -213,7 +243,7 @@ def book_select():
                         return
                     if not pdf_path_holder.get("path"):
                         # #region agent log
-                        open('/Users/leejaebin/Git/translater_ai_project/.cursor/debug-3c7733.log','a').write(_json.dumps({"sessionId":"3c7733","location":"app.py:do_add_no_pdf","message":"PDF path is None - ERROR triggered","data":{"holder_path":pdf_path_holder.get("path"),"holder_id":id(pdf_path_holder),"holder_keys":list(pdf_path_holder.keys())},"timestamp":__import__('time').time()*1000,"hypothesisId":"C,E"})+'\n')
+                        _debug_log("app.py:do_add_no_pdf", "PDF path is None", {"holder_keys": list(pdf_path_holder.keys())}, "H4,H5")
                         # #endregion
                         ui.notify("PDF 파일을 업로드하세요.", type="warning")
                         return
@@ -242,15 +272,27 @@ def book_select():
                             _run_postprocess, db_path_str, author_val, book_val
                         )
                         progress_log.push("후처리 완료.")
+                        # #region agent log
+                        _debug_log("app.py:do_add_success", "후처리 완료 직후, notify 전", {}, "H1,H5")
+                        # #endregion
                         ui.notify("DB 추가 및 번역이 완료되었습니다.", type="positive")
                         refresh_book_list()
                     except TranslaterAIError as e:
+                        # #region agent log
+                        _debug_log("app.py:do_add_translator_error", "TranslaterAIError", {"error": str(e)}, "H3,H5")
+                        # #endregion
                         progress_log.push(f"오류: {e}")
                         ui.notify(f"처리 실패: {e}", type="negative")
                     except Exception as e:
+                        # #region agent log
+                        _debug_log("app.py:do_add_exception", "Exception", {"error": str(e), "type": type(e).__name__}, "H3,H5")
+                        # #endregion
                         progress_log.push(f"오류: {e}")
                         ui.notify(f"처리 중 오류: {e}", type="negative")
                     finally:
+                        # #region agent log
+                        _debug_log("app.py:do_add_finally", "do_add finally", {}, "H1,H5")
+                        # #endregion
                         if pdf_path and Path(pdf_path).exists():
                             try:
                                 Path(pdf_path).unlink()
@@ -325,6 +367,7 @@ def book_select():
 
             render_book_list()
 
+    # DB 관리 탭 선택 시 storage에 기록해 재연결 후에도 해당 탭 복원 (위 _save_active_tab에서 설정)
 
 @ui.page("/mapping")
 def mapping(request: Request):
@@ -442,6 +485,7 @@ def main():
         title="철학 번역 뷰어",
         favicon="📖",
         storage_secret="philosophy-viewer-secret",
+        reconnect_timeout=7200,  # 2시간: PDF 전/후처리 등 장시간 작업 중 연결 끊겨도 재연결 시 세션 유지
     )
 
 
