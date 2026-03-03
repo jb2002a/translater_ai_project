@@ -46,4 +46,4 @@ docker run --rm "$IMAGE_NAME" grep -c "api/upload-pdf" /app/app.py || true
 echo ""
 echo "다음으로 기존 컨테이너를 끄고 새 이미지로 실행하세요:"
 echo "  docker stop trans-ai-service 2>/dev/null; docker rm trans-ai-service 2>/dev/null"
-echo "  docker run -d --name trans-ai-service -p 8000:8000 $IMAGE_NAME"
+echo "  docker run -d --name trans-ai-service -p 8080:8080 $IMAGE_NAME"

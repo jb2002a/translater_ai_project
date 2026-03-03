@@ -17,8 +17,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 애플리케이션 코드 복사
 COPY . .
 
-# NiceGUI 포트
-EXPOSE 8000
+# NiceGUI 기본 포트 (app.py에서 별도 포트 지정 시 이에 맞춰 변경)
+EXPOSE 8080
 
 # 환경 변수는 docker run 시 --env / --env-file 로 주입하는 것을 권장
 

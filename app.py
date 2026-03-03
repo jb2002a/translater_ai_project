@@ -5,13 +5,11 @@ import asyncio
 import os
 import sqlite3
 import tempfile
-import uuid
 from pathlib import Path
 from urllib.parse import quote_plus, unquote_plus
 
-from fastapi import Request, UploadFile, File
-from fastapi.responses import JSONResponse
-from nicegui import ui, app as nicegui_app
+from fastapi import Request
+from nicegui import ui
 
 from app_utils import (
     DB_PATH,
@@ -30,37 +28,6 @@ try:
     from main.exceptions import TranslaterAIError
 except ImportError:
     TranslaterAIError = Exception
-
-# 업로드된 파일을 고정 디렉터리에 저장 (upload_id를 파일명으로 사용)
-UPLOAD_DIR = Path(tempfile.gettempdir()) / "trans_ai_uploads"
-UPLOAD_DIR.mkdir(exist_ok=True)
-
-
-def _get_upload_path(upload_id: str) -> Path:
-    """upload_id에 해당하는 파일 경로 반환."""
-    return UPLOAD_DIR / f"{upload_id}.pdf"
-
-
-@nicegui_app.post("/api/upload-pdf")
-async def upload_pdf_api(file: UploadFile = File(...)):
-    """NiceGUI WebSocket 클라이언트와 독립적으로 PDF를 업로드하는 FastAPI 엔드포인트."""
-    name = file.filename or "upload.pdf"
-    try:
-        content = await file.read()
-        if not content:
-            return JSONResponse({"error": "업로드된 파일이 비어 있습니다."}, status_code=400)
-    except Exception as exc:
-        return JSONResponse({"error": str(exc)}, status_code=500)
-
-    upload_id = str(uuid.uuid4())
-    upload_path = _get_upload_path(upload_id)
-    try:
-        upload_path.write_bytes(content)
-    except Exception as exc:
-        return JSONResponse({"error": str(exc)}, status_code=500)
-
-    print(f"[upload-pdf] 업로드 완료: upload_id={upload_id}, path={upload_path}, size={len(content)}")
-    return {"upload_id": upload_id, "filename": name}
 
 
 def _sentence_card(container: ui.column, row_id: int, german: str, korean: str, seq: int) -> None:
@@ -179,7 +146,6 @@ def book_select():
             ).classes("text-slate-600 text-sm mb-2")
 
             pdf_path_holder: dict = {"path": None}
-            upload_id_holder: dict = {"id": None}
 
             with ui.card().classes("w-full max-w-lg p-4 mb-4"):
                 author_input = ui.input("저자").classes("w-full").props("outlined dense")
@@ -187,48 +153,34 @@ def book_select():
                     "outlined dense"
                 )
 
-                # NiceGUI WebSocket 클라이언트와 독립적인 업로드 UI
-                # fetch()로 /api/upload-pdf 엔드포인트에 직접 전송하여
-                # 'The client this element belongs to has been deleted' 오류를 방지합니다.
-                ui.html("""
-                    <div style="margin-top:8px">
-                        <label style="font-size:0.85rem;color:#64748b">PDF 파일</label><br>
-                        <input type="file" id="pdf-file-input" accept=".pdf"
-                            style="margin-top:4px;width:100%;font-size:0.9rem"
-                            onchange="handlePdfUpload(this)">
-                        <div id="pdf-upload-status"
-                            style="margin-top:4px;font-size:0.8rem;color:#64748b"></div>
-                    </div>
-                """)
+                async def on_upload(e):
+                    name = getattr(e, "name", None) or "upload.pdf"
+                    suffix = Path(name).suffix or ".pdf"
+                    fd, path = tempfile.mkstemp(suffix=suffix)
+                    fd_closed = False
+                    try:
+                        content = e.content.read()
+                        if not content:
+                            ui.notify("업로드된 파일이 비어 있습니다.", type="warning")
+                            os.close(fd)
+                            fd_closed = True
+                            try:
+                                os.unlink(path)
+                            except OSError:
+                                pass
+                            return
+                        os.write(fd, content)
+                    finally:
+                        if not fd_closed:
+                            os.close(fd)
+                    pdf_path_holder["path"] = path
+                    ui.notify(f"업로드 완료: {name}", type="positive")
 
-                ui.run_javascript("""
-                    window.__pdfUploadId = null;
-                    window.handlePdfUpload = async function(input) {
-                        const statusEl = document.getElementById('pdf-upload-status');
-                        if (!input.files || !input.files[0]) return;
-                        window.__pdfUploadId = null;
-                        if (statusEl) statusEl.textContent = '업로드 중...';
-                        const formData = new FormData();
-                        formData.append('file', input.files[0]);
-                        try {
-                            const resp = await fetch('/api/upload-pdf', {
-                                method: 'POST',
-                                body: formData
-                            });
-                            const data = await resp.json();
-                            if (data.upload_id) {
-                                window.__pdfUploadId = data.upload_id;
-                                if (statusEl) statusEl.textContent =
-                                    '✔ 업로드 완료: ' + data.filename;
-                            } else {
-                                if (statusEl) statusEl.textContent =
-                                    '✗ 업로드 실패: ' + (data.error || '알 수 없는 오류');
-                            }
-                        } catch(e) {
-                            if (statusEl) statusEl.textContent = '✗ 업로드 중 오류 발생';
-                        }
-                    };
-                """)
+                upload = ui.upload(
+                    label="PDF 파일",
+                    on_upload=on_upload,
+                    auto_upload=True,
+                ).classes("w-full").props("accept=.pdf")
 
                 progress_log = ui.log(max_lines=20).classes("w-full h-32 mt-2")
                 progress_spinner = ui.spinner(size="lg")
@@ -240,28 +192,9 @@ def book_select():
                     if not author_val or not book_val:
                         ui.notify("저자와 책 제목을 모두 입력하세요.", type="warning")
                         return
-
-                    try:
-                        upload_id = await ui.run_javascript(
-                            "window.__pdfUploadId || ''", timeout=5.0
-                        )
-                    except Exception as e:
-                        print(f"[do_add] JS 호출 에러: {e}")
-                        upload_id = None
-
-                    print(f"[do_add] upload_id from JS: {repr(upload_id)}")
-
-                    if not upload_id or not isinstance(upload_id, str) or len(upload_id) < 10:
-                        ui.notify("PDF 파일을 먼저 업로드하세요.", type="warning")
+                    if not pdf_path_holder.get("path"):
+                        ui.notify("PDF 파일을 업로드하세요.", type="warning")
                         return
-
-                    pdf_path = str(_get_upload_path(upload_id))
-                    if not Path(pdf_path).exists():
-                        print(f"[do_add] 파일 없음: {pdf_path}, UPLOAD_DIR 내용: {list(UPLOAD_DIR.iterdir())}")
-                        ui.notify("PDF 파일을 먼저 업로드하세요. (파일을 찾을 수 없음)", type="warning")
-                        return
-
-                    print(f"[do_add] 파일 확인됨: {pdf_path}")
 
                     conn = get_db_connection()
                     try:
@@ -270,16 +203,13 @@ def book_select():
                                 "이미 동일한 저자·책 제목이 DB에 있습니다. 중복 추가할 수 없습니다.",
                                 type="negative",
                             )
-                            try:
-                                Path(pdf_path).unlink()
-                            except OSError:
-                                pass
                             return
                     finally:
                         conn.close()
 
                     add_btn.set_visibility(False)
                     progress_spinner.set_visibility(True)
+                    pdf_path = pdf_path_holder["path"]
                     try:
                         progress_log.push("전처리 시작... (수십 분 걸릴 수 있습니다)")
                         await asyncio.to_thread(
@@ -304,15 +234,9 @@ def book_select():
                                 Path(pdf_path).unlink()
                             except OSError:
                                 pass
+                        pdf_path_holder["path"] = None
                         progress_spinner.set_visibility(False)
                         add_btn.set_visibility(True)
-                        await ui.run_javascript(
-                            "window.__pdfUploadId = null;"
-                            "var s = document.getElementById('pdf-upload-status');"
-                            "if(s) s.textContent = '';"
-                            "var inp = document.getElementById('pdf-file-input');"
-                            "if(inp) inp.value = '';"
-                        )
 
                 add_btn = ui.button("추가", on_click=do_add).props(
                     "unelevated color=primary"
@@ -492,14 +416,10 @@ def mapping(request: Request):
 
 
 def main():
-    import uvicorn
     ui.run(
         title="철학 번역 뷰어",
         favicon="📖",
         storage_secret="philosophy-viewer-secret",
-        host="0.0.0.0",
-        port=8000,
-        show=False,
     )
 
 
