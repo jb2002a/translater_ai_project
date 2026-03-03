@@ -39,11 +39,13 @@ def fetch_german_sentences_within_tokens(
     author: str,
     book_title: str,
     max_tokens: int = 10000,
+    max_chunks: int = 5,
     chars_per_token: int = DEFAULT_CHARS_PER_TOKEN,
 ) -> List[List[Tuple[int, str]]]:
     """
     미번역(korean_sentence IS NULL) 문장을 id 순으로 조회하며,
     max_tokens 이내로 묶은 청크들의 리스트를 반환한다.
+    max_chunks에 도달하면 즉시 반환하며, 나머지는 다음 사이클에서 처리된다.
     """
     chunks: List[List[Tuple[int, str]]] = []
     current_chunk: List[Tuple[int, str]] = []
@@ -64,6 +66,9 @@ def fetch_german_sentences_within_tokens(
             )
 
             for row_id, german_sentence in cur:
+                if len(chunks) >= max_chunks:
+                    break
+
                 sentence = german_sentence or ""
                 chunk_tokens = _estimate_tokens(sentence, chars_per_token)
 
@@ -75,7 +80,7 @@ def fetch_german_sentences_within_tokens(
                 total_tokens += chunk_tokens
                 current_chunk.append((row_id, sentence))
 
-        if current_chunk:
+        if current_chunk and len(chunks) < max_chunks:
             chunks.append(current_chunk)
 
     except sqlite3.Error as e:

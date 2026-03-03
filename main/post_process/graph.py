@@ -38,7 +38,7 @@ def create_translation_workflow():
         {"translate": "translate", END: END},
     )
     workflow.add_edge("translate", "save_translations")
-    workflow.add_edge("save_translations", END)
+    workflow.add_edge("save_translations", "fetch_sentences")
 
     return workflow.compile()
 

@@ -16,7 +16,7 @@ def get_chat_model_anthropic():
     if not api_key:
         raise MissingConfigError("ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.")
     return ChatAnthropic(
-        model="claude-opus-4-6", api_key=api_key
+        model="claude-opus-4-6", api_key=api_key, max_retries=5
     )
 
 

@@ -1,5 +1,7 @@
 # This file handles the initial translation of pre-processed German text into Korean
 
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Tuple
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -9,8 +11,23 @@ from ...exceptions import LLMProviderError, TranslaterAIError
 from ...models import models
 from ..prompts.prompts import TRANSLATION_PROMPT
 
-# 병렬 번역 시 최대 동시 LLM 호출 수 (API rate limit 고려)
-_MAX_PARALLEL_WORKERS = 3
+# 병렬 번역 시 최대 동시 LLM 호출 수 (Claude Opus Output TPM 90K 고려)
+_MAX_PARALLEL_WORKERS = 5
+_MIN_REQUEST_INTERVAL = 1.0
+
+_rate_lock = threading.Lock()
+_last_request_time: float = 0.0
+
+
+def _throttle() -> None:
+    """API rate limit 고려: 요청 간 최소 간격 유지."""
+    global _last_request_time
+    with _rate_lock:
+        now = time.monotonic()
+        elapsed = now - _last_request_time
+        if elapsed < _MIN_REQUEST_INTERVAL:
+            time.sleep(_MIN_REQUEST_INTERVAL - elapsed)
+        _last_request_time = time.monotonic()
 
 
 class TranslationResult(BaseModel):
@@ -34,6 +51,7 @@ def _translate_single_chunk(
     """단일 청크를 한 번의 LLM 호출로 번역."""
     if not chunk:
         return []
+    _throttle()
     chat = models.get_chat_model_anthropic()
     structured_chat = chat.with_structured_output(BatchTranslationResult)
     system_prompt = TRANSLATION_PROMPT.format(AUTHOR=author, BOOK_TITLE=book_title)
