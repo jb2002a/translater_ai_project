@@ -290,6 +290,12 @@ python app.py
   ```
   (클론 경로 기본값: `$HOME/translater_ai_project_from_git`, 이미지 이름: `trans-ai-app`)
 
+- **파일 업로드가 동작하지 않을 때** (EC2/NiceGUI):
+  - **문법 검증**: `run.sh`는 실행 전 `python3 -m py_compile app.py`를 수행합니다. 배포 후 stderr에 `IndentationError`/`SyntaxError`가 있으면 해당 오류를 수정한 뒤 재배포하세요.
+  - **메모리**: 작은 PDF(1MB 미만)로 먼저 업로드가 되는지 확인하세요. 작은 파일만 되고 큰 파일에서만 실패하면 EC2 인스턴스 메모리 부족 가능성이 있으므로, `app.py`는 업로드 시 `e.file.save(path)`로 디스크에 직접 저장하도록 되어 있습니다.
+  - **보안 그룹**: 앱이 사용하는 포트(예: 8000)가 인바운드 허용인지 확인하고, 대용량 업로드 시 타임아웃이 나면 ALB/리버스 프록시 타임아웃을 늘려보세요.
+  - **업로드 크기 제한**: 현재 `ui.upload`에는 `max_file_size=50MB`가 설정되어 있어, 그 이상은 클라이언트에서 차단됩니다. HTTPS 사용 시 업로드 요청도 HTTPS로 가도록 하세요.
+
 ---
 
 ## 데이터베이스
