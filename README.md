@@ -284,6 +284,11 @@ python app.py
   (예: `docker build -t trans-ai . && docker stop trans-ai-service; docker run -d ...`)
 - PDF 업로드 시 `RuntimeError: The client this element belongs to has been deleted` 가 나오면,  
   `reconnect_timeout=7200` 이 적용된 최신 `app.py` 로 이미지를 다시 빌드·배포했는지 확인하세요.
+- **이미지가 계속 예전 코드로 나올 때**: EC2 로컬이 오래됐다면, GitHub 최신 코드로 이미지를 만드세요.
+  ```bash
+  bash scripts/build-from-github.sh
+  ```
+  (클론 경로 기본값: `$HOME/translater_ai_project_from_git`, 이미지 이름: `trans-ai-app`)
 
 ---
 
