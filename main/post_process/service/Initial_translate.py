@@ -2,7 +2,6 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Tuple
-import langsmith as ls
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
@@ -44,8 +43,7 @@ def _translate_single_chunk(
         SystemMessage(content=system_prompt),
         HumanMessage(content=human_message),
     ]
-    with ls.tracing_context(enabled=False):
-        result = structured_chat.invoke(messages)
+    result = structured_chat.invoke(messages)
     return [(t.pk, t.text) for t in result.translations]
 
 
