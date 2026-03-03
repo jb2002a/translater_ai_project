@@ -228,7 +228,10 @@ def book_select():
                 ui.element("span").props(f"id=pdf-upload-token data-token={upload_token}").style("display:none")
                 with ui.column().classes("w-full"):
                     ui.label("PDF 파일").classes("text-sm text-slate-600")
-                    ui.element("input").props("type=file accept=.pdf id=pdf-file-input").classes("w-full")
+                    file_input = ui.element("input").props("type=file accept=.pdf id=pdf-file-input").classes("w-full").style("display: none")
+                    ui.button("PDF 선택 (업로드)", on_click=lambda: ui.run_javascript("document.getElementById('pdf-file-input').click();")).props(
+                        "outlined"
+                    ).classes("mt-1")
                     ui.label("").classes("text-sm text-green-600 mt-1").props("id=pdf-upload-status")
                 ui.run_javascript(
                     """
