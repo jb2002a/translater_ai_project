@@ -34,7 +34,7 @@ def _translate_single_chunk(
     """단일 청크를 한 번의 LLM 호출로 번역."""
     if not chunk:
         return []
-    chat = models.get_chat_model_google_translation()
+    chat = models.get_chat_model_anthropic()
     structured_chat = chat.with_structured_output(BatchTranslationResult)
     system_prompt = TRANSLATION_PROMPT.format(AUTHOR=author, BOOK_TITLE=book_title)
     parts = [f"---\npk: {pk}\n\n[텍스트]\n{text}" for pk, text in chunk]
@@ -72,4 +72,4 @@ def initial_translate_batch(
     except TranslaterAIError:
         raise
     except Exception as e:
-        raise LLMProviderError("Gemini 번역 API 호출 실패", cause=e) from e
+        raise LLMProviderError("Claude 번역 API 호출 실패", cause=e) from e

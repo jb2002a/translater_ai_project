@@ -10,13 +10,13 @@ load_dotenv()  # Load environment variables from .env file
 # LangSmith: LANGCHAIN_TRACING_V2=true, LANGSMITH_API_KEY 설정 시 자동 트레이싱 (콜백 불필요)
 
 
-# for post-processing
+# for post-processing (translation)
 def get_chat_model_anthropic():
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         raise MissingConfigError("ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.")
     return ChatAnthropic(
-        model="claude-sonnet-4-5-20250929", api_key=api_key
+        model="claude-opus-4-6", api_key=api_key
     )
 
 
