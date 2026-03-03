@@ -154,38 +154,32 @@ def book_select():
                 )
 
                 async def on_upload(e):
-                    file_obj = getattr(e, "file", None) or getattr(e, "content", None)
-                    if file_obj is None:
-                        ui.notify("업로드 API를 사용할 수 없습니다.", type="negative")
-                        return
-                    name = getattr(file_obj, "name", None) or getattr(e, "name", None) or "upload.pdf"
+                    name = getattr(e, "name", None) or "upload.pdf"
                     suffix = Path(name).suffix or ".pdf"
                     fd, path = tempfile.mkstemp(suffix=suffix)
+                    fd_closed = False
                     try:
-                        os.close(fd)
-                        await file_obj.save(path)
-                        if os.path.getsize(path) == 0:
+                        content = e.content.read()
+                        if not content:
                             ui.notify("업로드된 파일이 비어 있습니다.", type="warning")
+                            os.close(fd)
+                            fd_closed = True
                             try:
                                 os.unlink(path)
                             except OSError:
                                 pass
                             return
-                        pdf_path_holder["path"] = path
-                        ui.notify(f"업로드 완료: {name}", type="positive")
-                    except OSError as err:
-                        ui.notify(f"파일 저장 실패: {err}", type="negative")
-                        try:
-                            if os.path.exists(path):
-                                os.unlink(path)
-                        except OSError:
-                            pass
+                        os.write(fd, content)
+                    finally:
+                        if not fd_closed:
+                            os.close(fd)
+                    pdf_path_holder["path"] = path
+                    ui.notify(f"업로드 완료: {name}", type="positive")
 
                 upload = ui.upload(
                     label="PDF 파일",
                     on_upload=on_upload,
                     auto_upload=True,
-                    max_file_size=50 * 1024 * 1024,
                 ).classes("w-full").props("accept=.pdf")
 
                 progress_log = ui.log(max_lines=20).classes("w-full h-32 mt-2")
