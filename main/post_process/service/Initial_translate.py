@@ -1,9 +1,12 @@
 # This file handles the initial translation of pre-processed German text into Korean
 
+import logging
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Tuple
+
+import langsmith as ls
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
@@ -11,8 +14,10 @@ from ...exceptions import LLMProviderError, TranslaterAIError
 from ...models import models
 from ..prompts.prompts import TRANSLATION_PROMPT
 
-# 병렬 번역 시 최대 동시 LLM 호출 수 (Claude Opus Output TPM 90K 고려)
-_MAX_PARALLEL_WORKERS = 5
+logger = logging.getLogger(__name__)
+
+# 병렬 번역 시 최대 동시 LLM 호출 수 (청크 2개 / 워커 2개)
+_MAX_PARALLEL_WORKERS = 2
 _MIN_REQUEST_INTERVAL = 1.0
 
 _rate_lock = threading.Lock()
@@ -61,7 +66,11 @@ def _translate_single_chunk(
         SystemMessage(content=system_prompt),
         HumanMessage(content=human_message),
     ]
-    result = structured_chat.invoke(messages)
+    pk_range = f"{chunk[0][0]}..{chunk[-1][0]}" if len(chunk) > 1 else str(chunk[0][0])
+    logger.info("initial_translate: 청크 요청 (pk=%s, 문장 %d건)", pk_range, len(chunk))
+    with ls.tracing_context(enabled=False):
+        result = structured_chat.invoke(messages)
+    logger.info("initial_translate: 청크 완료 (pk=%s, 번역 %d건)", pk_range, len(result.translations))
     return [(t.pk, t.text) for t in result.translations]
 
 
@@ -76,18 +85,23 @@ def initial_translate_batch(
     if not items:
         return []
 
-    try:
-        workers = min(_MAX_PARALLEL_WORKERS, len(items))
-        results: List[Tuple[int, str]] = []
-        with ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = [
-                executor.submit(_translate_single_chunk, chunk, author, book_title)
-                for chunk in items
-            ]
-            for future in futures:
+    workers = min(_MAX_PARALLEL_WORKERS, len(items))
+    results: List[Tuple[int, str]] = []
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [
+            executor.submit(_translate_single_chunk, chunk, author, book_title)
+            for chunk in items
+        ]
+        for idx, future in enumerate(futures):
+            try:
                 results.extend(future.result())
-        return results
-    except TranslaterAIError:
-        raise
-    except Exception as e:
-        raise LLMProviderError("Claude 번역 API 호출 실패", cause=e) from e
+            except (TranslaterAIError, LLMProviderError, Exception) as e:
+                first_pk = items[idx][0][0] if items[idx] else None
+                logger.warning(
+                    "청크 번역 실패(건너뜀, 다음 사이클에 재시도). chunk_index=%s, first_pk=%s: %s",
+                    idx,
+                    first_pk,
+                    e,
+                    exc_info=True,
+                )
+    return results

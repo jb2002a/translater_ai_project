@@ -2,6 +2,7 @@
 철학 번역 DB 뷰어 - 책 선택 + 1:1 매핑 (NiceGUI, 무한 스크롤)
 """
 import asyncio
+import logging
 import os
 import sqlite3
 import tempfile
@@ -28,6 +29,11 @@ try:
     from main.exceptions import TranslaterAIError
 except ImportError:
     TranslaterAIError = Exception
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 
 
 def _sentence_card(container: ui.column, row_id: int, german: str, korean: str, seq: int) -> None:
