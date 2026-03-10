@@ -2,6 +2,7 @@ SoMaJo>=2.0.0
 fastapi>=0.109.0
 nicegui>=2.0.0
 pymupdf
+marker-pdf  # PDF → 마크다운 추출 (테스트용 ExtractServiceMarker)
 python-dotenv
 langsmith
 langchain
