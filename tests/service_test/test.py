@@ -3,7 +3,7 @@ from paddleocr import PPStructureV3
 
 # 프로젝트 루트 기준 경로 (실행 위치에 무관하게 동작)
 _tests_dir = Path(__file__).resolve().parent.parent
-input_file = _tests_dir / "resoruces_test" / "test_seperated.pdf"
+input_file = _tests_dir / "resources_test" / "test_seperated.pdf"
 output_path = Path(__file__).resolve().parent / "results_test"
 
 pipeline = PPStructureV3()
