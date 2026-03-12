@@ -1,14 +1,24 @@
-SoMaJo>=2.0.0
+# 앱 코어
 fastapi>=0.109.0
 nicegui>=2.0.0
-pymupdf
-marker-pdf  # PDF → 마크다운 추출 (테스트용 ExtractServiceMarker)
-python-dotenv
-langsmith
-langchain
-langchain-core
-langchain-anthropic
-langchain-google-genai
-langgraph
+python-dotenv>=1.0.0
 pydantic>=2.0.0
+
+# PDF / 텍스트 처리
+pymupdf>=1.24.0
+SoMaJo>=2.0.0
+
+# PDF 내보내기
 reportlab>=4.0.0
+
+# LangChain / LangGraph / LangSmith
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-anthropic>=0.2.0
+langchain-google-genai>=2.0.0
+langgraph>=0.2.0
+langsmith>=0.2.0
+
+# 테스트·실험용 (선택)
+# marker-pdf   # PDF → 마크다운 (ExtractServiceMarker 등)
+# paddleocr    # PPStructureV3 등 테스트 스크립트용
