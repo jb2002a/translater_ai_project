@@ -23,4 +23,6 @@ SoMaJo==2.4.3
 
 # Used in tests (paddleocr)
 paddleocr==3.4.0
-paddlepaddle==3.2.0
+
+#python -m pip install paddlepaddle==3.3.0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
+paddlepaddle==3.3.0
