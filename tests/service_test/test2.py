@@ -33,7 +33,7 @@ for res in output:
 
 # 본문 마크다운 저장
 markdown_result = pipeline.concatenate_markdown_pages(markdown_list)
-markdown_texts = markdown_result.markdown_texts
+markdown_texts = markdown_result.markdown["markdown_texts"]
 
 mkd_file_path = output_path / f"{input_file.stem}.md"
 with open(mkd_file_path, "w", encoding="utf-8") as f:
