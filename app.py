@@ -426,6 +426,8 @@ def main():
         title="철학 번역 뷰어",
         favicon="📖",
         storage_secret="philosophy-viewer-secret",
+        host="0.0.0.0",   # Docker 컨테이너 외부 접근 허용
+        port=int(os.environ.get("APP_PORT", 8080)),
     )
 
 

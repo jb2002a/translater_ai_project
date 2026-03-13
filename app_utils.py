@@ -1,8 +1,11 @@
 """앱 공통 유틸리티"""
+import os
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path(__file__).resolve().parent / "philosophy_translation.db"
+# APP_DB_PATH 환경변수가 있으면 해당 경로 사용 (Docker 볼륨 대응)
+# 없으면 프로젝트 루트의 기본 경로 사용
+DB_PATH = Path(os.environ.get("APP_DB_PATH", Path(__file__).resolve().parent / "philosophy_translation.db"))
 PAGE_SIZE = 20
 
 

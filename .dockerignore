@@ -1,0 +1,39 @@
+# 가상환경
+.venv/
+venv/
+env/
+
+# Python 캐시
+__pycache__/
+*.py[cod]
+*.pyo
+
+# 테스트 / 임시 파일
+tests/
+output/
+pages/
+*.pdf
+
+# DB (런타임에 /data 볼륨으로 관리)
+*.db
+
+# 환경 변수 (민감 정보)
+*.env
+.env*
+local.env
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.cursor/
+.vscode/
+*.code-workspace
+
+# 로그
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
