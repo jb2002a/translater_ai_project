@@ -7,7 +7,8 @@ input_file = _tests_dir / "resources_test" / "sperated_small.pdf"
 output_path = Path(__file__).resolve().parent / "results_test"
 output_path.mkdir(parents=True, exist_ok=True)
 
-pipeline = PPStructureV3(lang="de")
+# PaddlePaddle 3.3.0+ CPU oneDNN/PIR 버그 우회 (enable_mkldnn=False)
+pipeline = PPStructureV3(lang="de", enable_mkldnn=False)
 output = pipeline.predict(input=str(input_file))
 
 markdown_list = []
